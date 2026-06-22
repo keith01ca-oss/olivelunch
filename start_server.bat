@@ -1,0 +1,6 @@
+@echo off
+echo Starting Olive Lunch SaaS Development Server...
+echo Opening http://localhost:3000...
+start http://localhost:3000
+npm run dev
+pause

@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 60 30% 98%; /* Creamy off-white */
+    --foreground: 120 10% 15%; /* Deep dark olive/charcoal */
+    --card: 0 0% 100%;
+    --card-foreground: 120 10% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 10% 15%;
+    
+    /* Primary: Vibrant, rich olive green */
+    --primary: 84 50% 40%;
+    --primary-foreground: 60 30% 98%;
+    
+    /* Secondary: Soft muted green for less emphasis */
+    --secondary: 84 30% 85%;
+    --secondary-foreground: 84 50% 25%;
+    
+    /* Muted: Subtle backgrounds */
+    --muted: 60 15% 90%;
+    --muted-foreground: 120 5% 45%;
+    
+    /* Accent: A complementary warm tone (like a subtle orange/gold) for Pro-D warnings, etc */
+    --accent: 38 90% 55%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Destructive: Soft red */
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 60 15% 85%;
+    --input: 60 15% 85%;
+    --ring: 84 50% 40%;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 120 15% 10%; /* Very dark green/black */
+    --foreground: 60 30% 98%;
+    --card: 120 10% 14%;
+    --card-foreground: 60 30% 98%;
+    --popover: 120 10% 14%;
+    --popover-foreground: 60 30% 98%;
+    
+    --primary: 84 60% 50%; /* Brighter olive for dark mode */
+    --primary-foreground: 120 15% 10%;
+    
+    --secondary: 120 10% 20%;
+    --secondary-foreground: 60 30% 98%;
+    
+    --muted: 120 10% 20%;
+    --muted-foreground: 60 15% 70%;
+    
+    --accent: 38 90% 60%;
+    --accent-foreground: 120 15% 10%;
+    
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 120 10% 25%;
+    --input: 120 10% 25%;
+    --ring: 84 60% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    /* Optional subtle gradient background */
+    background-image: radial-gradient(circle at top right, rgba(132, 169, 140, 0.05), transparent 400px);
+  }
+}
+
+@media print {
+  /* Reset layouts from flex/grid to block for print flow */
+  html, body, #__next, .min-h-screen, main {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide navigation sidebar and other print-hidden items */
+  aside, nav, .print\:hidden, .no-print {
+    display: none !important;
+  }
+
+  /* Ensure all child components fit within page width */
+  .space-y-8, .space-y-12, .grid {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Default printing page layout with margins */
+  @page {
+    size: auto;
+    margin: 0.6in;
+  }
+}
