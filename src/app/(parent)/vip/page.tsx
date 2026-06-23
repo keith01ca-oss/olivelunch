@@ -15,6 +15,7 @@ export default async function VIPPage() {
     .select('name, price_regular, price_vip')
     .eq('is_active', true)
     .eq('org_id', orgId)
+    .eq('category', 'main')
     .limit(4);
 
   return (
@@ -45,8 +46,9 @@ export default async function VIPPage() {
           
           <ul className="space-y-6 relative z-10 flex-grow">
             {[
-              { title: "Save up to 33% on every order", desc: "Signature meals for just $6 (reg $7.50). Chicken Nuggets drop to $2." },
+              { title: "Save up to 50% on every order", desc: "Meals for just $4.99 (reg $7.95)." },
               { title: "Discounted Sides & Drinks", desc: "Enjoy flat discounts on all add-ons to complete their lunch." },
+              { title: "Sick day protection", desc: "If your child is absent, text us by 8:30 AM that morning. We will issue a 100% full credit back." },
               { title: "Priority Customer Support", desc: "Jump to the front of the line if you ever need help or adjustments." },
               { title: "No commitments, cancel anytime", desc: "Manage your subscription instantly from your dashboard." }
             ].map((benefit, i) => (

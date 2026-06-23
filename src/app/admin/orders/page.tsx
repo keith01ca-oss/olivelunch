@@ -46,7 +46,8 @@ export default async function AdminOrdersPage({
         quantity,
         unit_price,
         total_price,
-        dishes ( id, name, category )
+        is_large,
+        dishes ( id, name, category, has_large, large_name )
       )
     `)
     .order('order_date', { ascending: false })
@@ -61,7 +62,7 @@ export default async function AdminOrdersPage({
     { data: children }
   ] = await Promise.all([
     query,
-    supabaseAdmin.from('dishes').select('id, name, category, price_regular, price_vip').eq('is_active', true).is('deleted_at', null).eq('org_id', orgId),
+    supabaseAdmin.from('dishes').select('id, name, category, price_regular, price_vip, has_large, large_name, large_price_regular, large_price_vip').eq('is_active', true).is('deleted_at', null).eq('org_id', orgId),
     supabaseAdmin.from('children').select('id, name, division, parent_id, schools(name), parents!inner(name, is_vip, org_id)').eq('parents.org_id', orgId)
   ]);
 

@@ -212,34 +212,59 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
 
   // Aggregate Data
   const { mealTotals, ingredientTotals, totalPrepTime, totalCookTime, totalPackSeconds } = useMemo(() => {
-    // key is "dishId:isLarge"
-    const mealMap: Record<string, number> = {};
+    // key is "dishId" — combine regular + large orders of same dish
+    const mealMap: Record<string, { reg: number; large: number }> = {};
     const ingMap: Record<string, { amount: number; unit: string }> = {};
     let prep = 0, cook = 0, packSeconds = 0;
 
     orders.forEach(order => {
       order.order_items.forEach((item: any) => {
-        const key = `${item.dish_id}:${!!item.is_large}`;
-        mealMap[key] = (mealMap[key] || 0) + item.quantity;
+        const dishId = item.dish_id;
+        if (!mealMap[dishId]) mealMap[dishId] = { reg: 0, large: 0 };
+        if (item.is_large) {
+          mealMap[dishId].large += item.quantity;
+        } else {
+          mealMap[dishId].reg += item.quantity;
+        }
       });
     });
 
-    Object.entries(mealMap).forEach(([key, totalQty]) => {
-      const [dishId, isLargeStr] = key.split(':');
-      const isLarge = isLargeStr === 'true';
+    Object.entries(mealMap).forEach(([dishId, counts]) => {
       const dish = initialDishes.find(d => d.id === dishId);
       if (dish) {
         if (dish.ingredients) {
-          dish.ingredients.forEach(ing => {
-            const ingKey = `${ing.name}|${ing.unit}`;
-            if (!ingMap[ingKey]) ingMap[ingKey] = { amount: 0, unit: ing.unit };
-            ingMap[ingKey].amount += (ing.amount * totalQty);
-          });
+          // Process regular orders
+          if (counts.reg > 0) {
+            dish.ingredients.forEach((ing: any) => {
+              const ingKey = `${ing.name}|${ing.unit}`;
+              if (!ingMap[ingKey]) ingMap[ingKey] = { amount: 0, unit: ing.unit };
+              ingMap[ingKey].amount += (ing.amount * counts.reg);
+            });
+          }
+          // Process large orders
+          if (counts.large > 0) {
+            dish.ingredients.forEach((ing: any) => {
+              const ingKey = `${ing.name}|${ing.unit}`;
+              if (!ingMap[ingKey]) ingMap[ingKey] = { amount: 0, unit: ing.unit };
+              let effectiveAmount = ing.amount;
+              if (ing.large_amount !== undefined && ing.large_amount !== null && ing.large_amount !== '' && Number(ing.large_amount) > 0) {
+                effectiveAmount = Number(ing.large_amount);
+              } else {
+                effectiveAmount = ing.amount * 1.5;
+              }
+              ingMap[ingKey].amount += (effectiveAmount * counts.large);
+            });
+          }
         }
         prep += (dish.prep_time_minutes || 0);
         cook += (dish.cook_time_minutes || 0);
-        packSeconds += ((dish.pack_time_seconds || 0) * totalQty);
+        packSeconds += ((dish.pack_time_seconds || 0) * (counts.reg + counts.large));
       }
+    });
+
+    // Filter out zero-amount ingredients
+    Object.keys(ingMap).forEach(k => {
+      if (ingMap[k].amount === 0) delete ingMap[k];
     });
 
     return { mealTotals: mealMap, ingredientTotals: ingMap, totalPrepTime: prep, totalCookTime: cook, totalPackSeconds: packSeconds };
@@ -521,7 +546,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
             {activeTab === 'prep' ? 'Kitchen Prep Sheet' : 'Delivery Manifest'}
           </h1>
           <div className="flex justify-between items-center mt-1">
-            <p className="text-lg font-bold text-gray-700">{format(new Date(selectedDate), 'EEEE, MMMM d, yyyy')}</p>
+            <p className="text-lg font-bold text-gray-700">{format(new Date(selectedDate + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}</p>
             <p className="text-sm font-bold">Total Orders: {orders.length}</p>
           </div>
         </div>
@@ -570,39 +595,60 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   <div className="space-y-4">
                     {uniqueCategories.map(category => {
                       const categoryMeals = Object.entries(mealTotals)
-                        .map(([key, qty]) => {
-                          const [dishId, isLargeStr] = key.split(':');
+                        .map(([dishId, counts]) => {
                           const dish = initialDishes.find(d => d.id === dishId);
-                          return {
-                            key,
-                            qty,
-                            dish,
-                            isLarge: isLargeStr === 'true'
-                          };
+                          return { dishId, counts, dish };
                         })
-                        .filter(m => m.dish && m.dish.category === category && m.qty > 0);
+                        .filter(m => m.dish && m.dish.category === category && (m.counts.reg + m.counts.large) > 0);
 
                       if (categoryMeals.length === 0) return null;
                       return (
                         <div key={category} className="bg-card border rounded-xl overflow-hidden shadow-sm print:border-gray-400">
                           <div className="bg-muted/40 px-4 py-2 border-b font-bold uppercase tracking-wider text-xs">{category}</div>
                           <ul className="divide-y">
-                            {categoryMeals.map(({ key, qty, dish, isLarge }) => {
-                              const isItemLarge = isLarge && !!dish?.has_large;
-                              const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                            {categoryMeals.map(({ dishId, counts, dish }) => {
+                              const totalBoxes = counts.reg + counts.large;
+                              // Calculate total pieces using ingredients
+                              const regPieces = dish?.ingredients?.reduce((sum: number, ing: any) => sum + (ing.amount * counts.reg), 0) || 0;
+                              const largePieces = dish?.ingredients?.reduce((sum: number, ing: any) => {
+                                const amt = (ing.large_amount !== undefined && ing.large_amount !== null && ing.large_amount !== '' && Number(ing.large_amount) > 0)
+                                  ? Number(ing.large_amount) : ing.amount * 1.5;
+                                return sum + (amt * counts.large);
+                              }, 0) || 0;
+
                               return (
-                                <li key={key} className="p-4 flex flex-col gap-3">
+                                <li key={dishId} className="p-4 flex flex-col gap-3">
                                   <div className="flex items-center justify-between">
-                                    <span className="font-bold text-lg">{displayName}</span>
-                                    <span className="text-2xl font-black bg-primary/10 text-primary px-4 py-1 rounded-lg print:bg-transparent print:text-black print:border-2 print:border-black">{qty}</span>
+                                    <div>
+                                      <span className="font-bold text-lg">{dish?.name || ''}</span>
+                                      <div className="flex gap-2 mt-1">
+                                        {counts.reg > 0 && (
+                                          <span className="text-xs bg-muted border rounded-md px-2 py-0.5 font-semibold">
+                                            {counts.reg} regular
+                                          </span>
+                                        )}
+                                        {counts.large > 0 && (
+                                          <span className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5 font-semibold">
+                                            {counts.large} large
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className="text-2xl font-black bg-primary/10 text-primary px-4 py-1 rounded-lg print:bg-transparent print:text-black print:border-2 print:border-black">{totalBoxes}</span>
                                   </div>
                                   {dish?.ingredients && dish.ingredients.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
-                                      {dish.ingredients.map(ing => (
-                                        <div key={ing.name} className="text-xs bg-muted border rounded-md px-2 py-1 font-medium">
-                                          <span className="text-primary font-bold mr-1">{ing.amount * qty}</span> {ing.unit} {ing.name}
-                                        </div>
-                                      ))}
+                                      {dish.ingredients.map((ing: any) => {
+                                        const totalAmt = (ing.amount * counts.reg) + 
+                                          ((ing.large_amount !== undefined && ing.large_amount !== null && ing.large_amount !== '' && Number(ing.large_amount) > 0)
+                                            ? Number(ing.large_amount) : ing.amount * 1.5) * counts.large;
+                                        if (totalAmt === 0) return null;
+                                        return (
+                                          <div key={ing.name} className="text-xs bg-muted border rounded-md px-2 py-1 font-medium">
+                                            <span className="text-primary font-bold mr-1">{totalAmt}</span> {ing.unit} {ing.name}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </li>

@@ -103,15 +103,15 @@ export default async function DashboardPage({
                 <Star className="h-5 w-5 text-accent fill-accent" />
                 <h3 className="text-base font-black text-slate-900 uppercase tracking-widest">VIP Benefit</h3>
               </div>
-              <p className="text-2xl font-black text-foreground leading-tight">Join VIP for just $6 (reg $7.5) signature meals</p>
+              <p className="text-2xl font-black text-foreground leading-tight">Join VIP & save up to 50% on every meal!</p>
               <p className="text-sm text-slate-800 mt-3 font-medium leading-relaxed">
-                Save on every order, like Chicken Nuggets from $3 to $2 and Wagyu Beef Gyoza from $4.50 to $3 — <strong className="text-primary font-bold">up to 33% off!</strong>
+                Get favorites like our 4pc Chicken Strips for just $4 (was $6.95)—that’s <strong className="text-primary font-bold">42% off!</strong>
               </p>
             </div>
 
             <div className="mt-4 pt-4 border-t border-accent/30 flex items-center justify-between relative">
               <div className="text-xs font-bold text-slate-700 leading-tight">
-                Get VIP pricing on <br/> every single item.
+                Save on every single order.
               </div>
               <Link href="/vip" className="rounded-full bg-accent px-5 py-2.5 text-sm font-black text-accent-foreground hover:bg-accent/90 transition-all shadow-md">
                 Upgrade Now

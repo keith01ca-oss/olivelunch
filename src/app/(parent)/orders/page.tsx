@@ -73,46 +73,61 @@ export default async function ParentOrdersPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
-          {orders.map(order => {
-            const cfg = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
-            const Icon = cfg.icon;
-            return (
-              <div key={order.id} className="bg-card border rounded-2xl shadow-sm overflow-hidden">
-                {/* Order Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/20">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold">{order.children?.name}</span>
-                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{order.children?.division}</span>
-                      <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.color}`}>
-                        <Icon className="w-3.5 h-3.5" />
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Lunch for <strong>{order.order_date}</strong> · Ordered {format(new Date(order.created_at), 'MMM d, yyyy')}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xl font-extrabold">${Number(order.total_amount).toFixed(2)}</p>
-                  </div>
-                </div>
+        <div className="space-y-8">
+          {Object.entries(
+            orders.reduce((groups, order) => {
+              // Add a default time to prevent timezone shifting issues with raw dates
+              const month = format(new Date(order.order_date + 'T12:00:00'), 'MMMM yyyy');
+              if (!groups[month]) groups[month] = [];
+              groups[month].push(order);
+              return groups;
+            }, {} as Record<string, typeof orders>)
+          ).map(([month, monthOrders]) => (
+            <div key={month} className="space-y-4">
+              <h3 className="text-2xl font-extrabold tracking-tight text-foreground border-b pb-2">{month}</h3>
+              <div className="space-y-4">
+                {monthOrders.map(order => {
+                  const cfg = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+                  const Icon = cfg.icon;
+                  return (
+                    <div key={order.id} className="bg-card border rounded-2xl shadow-sm overflow-hidden">
+                      {/* Order Header */}
+                      <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/20">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold">{order.children?.name}</span>
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{order.children?.division}</span>
+                            <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.color}`}>
+                              <Icon className="w-3.5 h-3.5" />
+                              {cfg.label}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Lunch for <strong>{order.order_date}</strong> · Ordered {format(new Date(order.created_at), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xl font-extrabold">${Number(order.total_amount).toFixed(2)}</p>
+                        </div>
+                      </div>
 
-                {/* Order Items */}
-                <div className="px-6 py-4 space-y-2">
-                  {order.order_items.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 text-sm">
-                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0">{item.quantity}</span>
-                      <span className="flex-1 font-medium">{item.dishes?.name || 'Unknown dish'}</span>
-                      <span className="text-xs text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded-full">{item.dishes?.category}</span>
-                      <span className="font-semibold text-sm">${Number(item.total_price).toFixed(2)}</span>
+                      {/* Order Items */}
+                      <div className="px-6 py-4 space-y-2">
+                        {order.order_items.map(item => (
+                          <div key={item.id} className="flex items-center gap-3 text-sm">
+                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0">{item.quantity}</span>
+                            <span className="flex-1 font-medium">{item.dishes?.name || 'Unknown dish'}</span>
+                            <span className="text-xs text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded-full">{item.dishes?.category}</span>
+                            <span className="font-semibold text-sm">${Number(item.total_price).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>

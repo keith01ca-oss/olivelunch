@@ -14,18 +14,25 @@ export interface AuthContext {
  * Resolves the default organization ID from cookies or queries the 'olive-lunch' slug from the database.
  */
 export async function getOrResolveOrgId(): Promise<string> {
-  const cookieOrgId = cookies().get('olive_org_id')?.value;
-  if (cookieOrgId) return cookieOrgId;
-
-  // Fallback to database lookup
+  // Query the 'olive-lunch' slug from the database as the default single-tenant organization
   const { data: org } = await supabaseAdmin
     .from('organizations')
     .select('id')
-    .eq('slug', 'olivelunch')
+    .eq('slug', 'olive-lunch')
     .single();
 
   if (org) {
     return org.id;
+  }
+
+  // Secondary fallback: query the first available organization
+  const { data: firstOrg } = await supabaseAdmin
+    .from('organizations')
+    .select('id')
+    .limit(1);
+
+  if (firstOrg && firstOrg.length > 0) {
+    return firstOrg[0].id;
   }
 
   // Return a fallback ID if the default org is not found yet
@@ -95,17 +102,15 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
       // organizations table might not exist yet — that's okay
     }
 
-    const insertPayload: Record<string, unknown> = {
+    const insertPayload = {
       clerk_user_id: clerkUserId,
-      email: email,
+      email: email || '',
       name: name,
-      is_vip: false,
+      org_id: resolvedOrgId || '00000000-0000-0000-0000-000000000000',
+      is_vip: false as boolean,
       referral_code: referralCode,
       referred_by: referredById,
     };
-    if (resolvedOrgId) {
-      insertPayload.org_id = resolvedOrgId;
-    }
 
     const { data: newParent, error: insertError } = await supabaseAdmin
       .from('parents')

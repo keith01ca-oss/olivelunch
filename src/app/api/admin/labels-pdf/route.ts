@@ -136,25 +136,24 @@ export async function GET(req: NextRequest) {
   });
 
   // --- Sequential school icon map — named pictographic icons matching physical sticker sheet ---
-  // ECS EC is reserved for 'cross'. All others get sequential from ICON_ORDER.
   const ICON_ORDER = [
-    'heart','star','anchor','crown',
+    'heart','star','crown',
     'lightning','moon','leaf','shield','flower','cloud',
     'snowflake','bell','arrow','fish','owl','elephant','dolphin',
     'horse','swan','panda','cat',
   ];
   const schoolIconMap: Record<string, string> = {};
-  let schoolIconIdx = 0;
   orders.forEach((o: any) => {
     const school = (o.children?.schools as any)?.name || '';
     if (school && !(school in schoolIconMap)) {
-      if (school === 'ECS EC') {
+      const schoolUpper = school.toUpperCase();
+      if (schoolUpper === 'ECS EC' || schoolUpper === 'RCS EC') {
         schoolIconMap[school] = 'cross';
-      } else if (school.toUpperCase().includes('WESTWIND')) {
+      } else if (schoolUpper.includes('WESTWIND')) {
         schoolIconMap[school] = 'wind';
       } else {
-        schoolIconMap[school] = ICON_ORDER[schoolIconIdx % ICON_ORDER.length];
-        schoolIconIdx++;
+        const hash = getStringHash(school);
+        schoolIconMap[school] = ICON_ORDER[hash % ICON_ORDER.length];
       }
     }
   });
@@ -320,7 +319,7 @@ export async function GET(req: NextRequest) {
     const symCX = x + padL + symSz + 1;
     const iconRowY = y + LABEL_H - 24;
     const schoolIconW = symSz * 2 + 7;
-    const schoolNameW = textW - schoolIconW - 24;
+    const schoolNameW = textW - schoolIconW;
 
     // Shared helper: draw the correct sticker-matching icon shape in black
     const icon = label.schoolIcon as string;
@@ -364,12 +363,6 @@ export async function GET(req: NextRequest) {
         doc.polygon(...pts).fill();
         break;
       }
-      case 'anchor': // ⚓
-        doc.circle(symCX, iconRowY - symSz * 0.65, symSz * 0.4).fill();
-        doc.rect(symCX - 1.3, iconRowY - symSz * 0.65, 2.6, symSz * 1.7).fill(); // stem
-        doc.rect(symCX - symSz * 0.85, iconRowY - symSz * 0.05, symSz * 1.7, 2.2).fill(); // crossbar
-        doc.polygon([symCX - symSz * 0.75, iconRowY + symSz * 0.65], [symCX, iconRowY + symSz], [symCX + symSz * 0.75, iconRowY + symSz * 0.65]).fill(); // base
-        break;
       case 'crown': // ♛
         doc.polygon(
           [symCX - symSz, iconRowY + symSz * 0.4],

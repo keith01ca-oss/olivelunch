@@ -19,7 +19,7 @@ export default function AddOrderModal({ orgId, dishes, childrenList, onClose, on
   const [childSearch, setChildSearch] = useState('');
   const [selectedChildId, setSelectedChildId] = useState<string>('');
   
-  const [selectedItems, setSelectedItems] = useState<{ dishId: string, quantity: number }[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ dishId: string, quantity: number, is_large: boolean }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredChildren = useMemo(() => {
@@ -36,7 +36,7 @@ export default function AddOrderModal({ orgId, dishes, childrenList, onClose, on
   const isVip = selectedChild?.parents?.is_vip || false;
 
   const handleAddItem = () => {
-    setSelectedItems([...selectedItems, { dishId: '', quantity: 1 }]);
+    setSelectedItems([...selectedItems, { dishId: '', quantity: 1, is_large: false }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -45,9 +45,14 @@ export default function AddOrderModal({ orgId, dishes, childrenList, onClose, on
     setSelectedItems(next);
   };
 
-  const updateItem = (index: number, field: 'dishId' | 'quantity', value: any) => {
+  const updateItem = (index: number, field: 'dishId' | 'quantity' | 'is_large', value: any) => {
     const next = [...selectedItems];
-    next[index] = { ...next[index], [field]: value };
+    // When dish changes, reset is_large
+    if (field === 'dishId') {
+      next[index] = { ...next[index], dishId: value, is_large: false };
+    } else {
+      next[index] = { ...next[index], [field]: value };
+    }
     setSelectedItems(next);
   };
 
@@ -60,7 +65,10 @@ export default function AddOrderModal({ orgId, dishes, childrenList, onClose, on
       const dish = dishes.find(d => d.id === item.dishId);
       if (!dish) return;
       
-      const price = isVip ? dish.price_vip : dish.price_regular;
+      const isLarge = item.is_large && dish.has_large;
+      const price = isLarge
+        ? (isVip ? (dish.large_price_vip ?? dish.price_vip) : (dish.large_price_regular ?? dish.price_regular))
+        : (isVip ? dish.price_vip : dish.price_regular);
       gross += price * item.quantity;
       total += price * item.quantity;
     });
@@ -87,12 +95,16 @@ export default function AddOrderModal({ orgId, dishes, childrenList, onClose, on
     try {
       const payloadItems = validItems.map(item => {
         const dish = dishes.find(d => d.id === item.dishId)!;
-        const unitPrice = isVip ? dish.price_vip : dish.price_regular;
+        const isLarge = item.is_large && dish.has_large;
+        const unitPrice = isLarge
+          ? (isVip ? (dish.large_price_vip ?? dish.price_vip) : (dish.large_price_regular ?? dish.price_regular))
+          : (isVip ? dish.price_vip : dish.price_regular);
         return {
           dish_id: dish.id,
           quantity: item.quantity,
           unit_price: unitPrice,
-          total_price: unitPrice * item.quantity
+          total_price: unitPrice * item.quantity,
+          is_large: isLarge
         };
       });
 
@@ -210,42 +222,75 @@ export default function AddOrderModal({ orgId, dishes, childrenList, onClose, on
                   const itemTotal = unitPrice * item.quantity;
 
                   return (
-                    <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-muted/20 p-3 rounded-xl border">
-                      <select
-                        value={item.dishId}
-                        onChange={e => updateItem(index, 'dishId', e.target.value)}
-                        className="flex-1 h-10 w-full sm:w-auto rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary bg-background shadow-sm font-medium"
-                      >
-                        <option value="">Select a dish...</option>
-                        {dishes.map(d => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} (${(isVip ? d.price_vip : d.price_regular).toFixed(2)})
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs font-bold text-muted-foreground">Qty:</label>
-                          <input 
-                            type="number" min="1" max="99"
-                            value={item.quantity}
-                            onChange={e => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                            className="w-16 h-10 text-center rounded-lg border focus:ring-1 focus:ring-primary shadow-sm"
-                          />
-                        </div>
-
-                        <div className="w-20 text-right font-black text-primary text-base">
-                          ${itemTotal.toFixed(2)}
-                        </div>
-
-                        <button 
-                          onClick={() => handleRemoveItem(index)}
-                          className="p-2 text-muted-foreground hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"
+                    <div key={index} className="flex flex-col gap-3 bg-muted/20 p-3 rounded-xl border">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        <select
+                          value={item.dishId}
+                          onChange={e => updateItem(index, 'dishId', e.target.value)}
+                          className="flex-1 h-10 w-full sm:w-auto rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary bg-background shadow-sm font-medium"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          <option value="">Select a dish...</option>
+                          {dishes.map(d => (
+                            <option key={d.id} value={d.id}>
+                              {d.name} (${(isVip ? d.price_vip : d.price_regular).toFixed(2)})
+                            </option>
+                          ))}
+                        </select>
+
+                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-bold text-muted-foreground">Qty:</label>
+                            <input 
+                              type="number" min="1" max="99"
+                              value={item.quantity}
+                              onChange={e => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                              className="w-16 h-10 text-center rounded-lg border focus:ring-1 focus:ring-primary shadow-sm"
+                            />
+                          </div>
+
+                          <div className="w-20 text-right font-black text-primary text-base">
+                            ${(() => {
+                              const isLarge = item.is_large && dish?.has_large;
+                              const price = isLarge
+                                ? (isVip ? (dish?.large_price_vip ?? dish?.price_vip ?? 0) : (dish?.large_price_regular ?? dish?.price_regular ?? 0))
+                                : (isVip ? (dish?.price_vip ?? 0) : (dish?.price_regular ?? 0));
+                              return (price * item.quantity).toFixed(2);
+                            })()}
+                          </div>
+
+                          <button 
+                            onClick={() => handleRemoveItem(index)}
+                            className="p-2 text-muted-foreground hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Large toggle — only shown when the dish has a large option */}
+                      {dish?.has_large && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground font-semibold">Size:</span>
+                          <div className="flex bg-muted p-0.5 rounded-lg text-xs font-bold">
+                            <button
+                              onClick={() => updateItem(index, 'is_large', false)}
+                              className={`px-3 py-1 rounded transition-all ${
+                                !item.is_large ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              Regular — ${(isVip ? dish.price_vip : dish.price_regular).toFixed(2)}
+                            </button>
+                            <button
+                              onClick={() => updateItem(index, 'is_large', true)}
+                              className={`px-3 py-1 rounded transition-all ${
+                                item.is_large ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {dish.large_name || 'Large'} — ${(isVip ? (dish.large_price_vip ?? dish.price_vip) : (dish.large_price_regular ?? dish.price_regular)).toFixed(2)}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

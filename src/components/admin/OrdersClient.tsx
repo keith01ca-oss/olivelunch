@@ -508,7 +508,10 @@ export default function OrdersClient({
                       
                       <div className="mt-2 text-xs font-medium text-primary line-clamp-1">
                         {order.order_items.length > 0 
-                          ? order.order_items.map(i => `${i.quantity}x ${i.dishes?.name}`).join(', ')
+                          ? order.order_items.map(i => {
+                              const name = (i.is_large && i.dishes?.large_name) ? i.dishes.large_name : i.dishes?.name;
+                              return `${i.quantity}x ${name}`;
+                            }).join(', ')
                           : 'No items in order'}
                       </div>
                     </div>
@@ -551,17 +554,19 @@ export default function OrdersClient({
                       </div>
                       
                       <div className="space-y-3">
-                        {order.order_items.map(item => (
+                        {order.order_items.map(item => {
+                          const displayName = (item.is_large && item.dishes?.large_name) ? item.dishes.large_name : (item.dishes?.name || 'Unknown');
+                          return (
                           <div key={item.id} className="flex items-center gap-3 text-sm">
                             <span className="w-7 h-7 rounded-lg bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center shrink-0">{item.quantity}</span>
                             <div className="flex-1">
-                              <p className="font-bold">{item.dishes?.name || 'Unknown'}</p>
+                              <p className="font-bold">{displayName}{item.is_large && <span className="ml-1 text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded font-bold uppercase">Large</span>}</p>
                               <p className="text-[10px] text-muted-foreground uppercase font-bold">{item.dishes?.category}</p>
                             </div>
-                            <span className="font-bold text-muted-foreground">$${Number(item.unit_price).toFixed(2)}</span>
+                            <span className="font-bold text-muted-foreground">${Number(item.unit_price).toFixed(2)}</span>
                             <span className="font-black w-16 text-right">${Number(item.total_price).toFixed(2)}</span>
                           </div>
-                        ))}
+                        )})}
                       </div>
                       <div className="mt-4 pt-4 border-t border-muted/50 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                         <div className="text-[10px] text-muted-foreground space-y-0.5">
@@ -593,7 +598,8 @@ export default function OrdersClient({
 
       {editingOrder && (
         <EditOrderModal 
-          order={editingOrder} 
+          order={editingOrder}
+          dishes={dishes || []}
           onClose={() => {
             setEditingOrder(null);
             window.location.reload();

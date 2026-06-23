@@ -9,6 +9,7 @@ interface Ingredient {
   amount: number;
   unit: string;
   cost_per_unit?: number;
+  large_amount?: number;
 }
 
 interface Overhead {
@@ -376,6 +377,7 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
                   <div className="flex gap-2 text-xs font-bold text-muted-foreground px-1">
                     <div className="flex-1">Ingredient</div>
                     <div className="w-16 text-center">Amt</div>
+                    {form.has_large && <div className="w-16 text-center text-primary">Lrg Amt</div>}
                     <div className="w-20">Unit</div>
                     <div className="w-20">Cost/Unit</div>
                     <div className="w-8"></div>
@@ -384,6 +386,9 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
                     <div key={idx} className="flex items-center gap-2">
                       <input type="text" placeholder="e.g. Chicken" value={ing.name} onChange={e => updateIngredient(idx, 'name', e.target.value)} className="flex-1 rounded border p-2 text-sm outline-none" />
                       <input type="number" step="0.01" min="0" value={ing.amount} onChange={e => updateIngredient(idx, 'amount', e.target.value)} className="w-16 rounded border p-2 text-sm text-center outline-none" />
+                      {form.has_large && (
+                        <input type="number" step="0.01" min="0" placeholder="-" value={ing.large_amount || ''} onChange={e => updateIngredient(idx, 'large_amount', e.target.value)} className="w-16 rounded border border-primary/30 bg-primary/5 p-2 text-sm text-center outline-none text-primary" title="Amount for Large option" />
+                      )}
                       <select 
                         value={ing.unit || 'pcs'} 
                         onChange={e => updateIngredient(idx, 'unit', e.target.value)}

@@ -141,6 +141,7 @@ export async function createOrderAdmin(data: {
       quantity: item.quantity,
       unit_price: item.unit_price,
       total_price: item.total_price,
+      is_large: item.is_large || false,
       delivery_area: 'classroom'
     }));
 
@@ -159,5 +160,51 @@ export async function createOrderAdmin(data: {
   } catch (err: any) {
     console.error('Error in createOrderAdmin:', err);
     return { error: err.message || 'Failed to create order' };
+  }
+}
+
+export async function addItemToOrderAdmin(orderId: string, item: {
+  dish_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  is_large: boolean;
+}) {
+  try {
+    // 1. Fetch the order to get current totals
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select('gross_amount, total_amount')
+      .eq('id', orderId)
+      .single();
+
+    if (orderError || !order) throw new Error('Order not found');
+
+    // 2. Insert the new order item
+    const { error: insertError } = await supabaseAdmin
+      .from('order_items')
+      .insert({
+        order_id: orderId,
+        dish_id: item.dish_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        is_large: item.is_large,
+        delivery_area: 'classroom'
+      });
+
+    if (insertError) throw insertError;
+
+    // 3. Update order totals
+    await supabaseAdmin.from('orders').update({
+      gross_amount: Number(order.gross_amount) + item.total_price,
+      total_amount: Number(order.total_amount) + item.total_price,
+    }).eq('id', orderId);
+
+    revalidatePath('/admin/orders');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in addItemToOrderAdmin:', err);
+    return { error: err.message || 'Failed to add item to order' };
   }
 }

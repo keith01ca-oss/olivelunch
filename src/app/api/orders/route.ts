@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'cad',
             product_data: {
               name: 'Olive Lunch Order',
               description: `Meals for ${orders.length} children`,
