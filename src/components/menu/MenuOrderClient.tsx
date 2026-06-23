@@ -12,6 +12,10 @@ interface Dish {
   price_regular: number;
   price_vip: number;
   is_active: boolean;
+  has_large?: boolean;
+  large_name?: string;
+  large_price_regular?: number;
+  large_price_vip?: number;
 }
 
 interface Props {
@@ -48,7 +52,24 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
 
   const [selectedChildId, setSelectedChildId] = useState<string>(initialChildId || childrenList[0]?.id || '');
   const [currentMonthDate, setCurrentMonthDate] = useState<Date>(availableMonths[0]);
+  const [sizeMode, setSizeMode] = useState<'reg' | 'large'>('reg');
 
+  // Load size mode
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('olive_size_mode');
+      if (saved === 'large' || saved === 'reg') {
+        setSizeMode(saved);
+      }
+    } catch (e) { console.error('Failed to load size mode', e); }
+  }, []);
+
+  const changeSizeMode = (mode: 'reg' | 'large') => {
+    setSizeMode(mode);
+    try {
+      localStorage.setItem('olive_size_mode', mode);
+    } catch (e) { console.error('Failed to save size mode', e); }
+  };
   
   const [cart, setCart] = useState<Cart>({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -444,7 +465,11 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       const qty = cart[dateKey][dishId];
       const dish = dishes.find(d => d.id === dishId);
       if (dish) {
-        totalPrice += (isVip ? dish.price_vip : dish.price_regular) * qty;
+        const isDishLarge = sizeMode === 'large' && dish.has_large;
+        const price = isDishLarge 
+          ? (isVip ? (dish.large_price_vip ?? dish.price_vip) : (dish.large_price_regular ?? dish.price_regular))
+          : (isVip ? dish.price_vip : dish.price_regular);
+        totalPrice += price * qty;
         totalItems += qty;
       }
     });
@@ -457,10 +482,14 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       const ordersArray = Object.keys(cart).map(date => ({
         child_id: selectedChildId,
         order_date: date,
-        items: Object.keys(cart[date]).map(dishId => ({
-          dish_id: dishId,
-          quantity: cart[date][dishId],
-        }))
+        items: Object.keys(cart[date]).map(dishId => {
+          const dish = dishes.find(d => d.id === dishId);
+          return {
+            dish_id: dishId,
+            quantity: cart[date][dishId],
+            is_large: sizeMode === 'large' && !!dish?.has_large
+          };
+        })
       }));
 
       const res = await fetch('/api/orders', {
@@ -625,8 +654,40 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                 <div className="space-y-1.5 pt-2">
                   {currentDayDishes.map(item => {
                     const qty = dayCart[item.id] || 0;
+                    const isDishLarge = sizeMode === 'large' && item.has_large;
+                    const displayName = isDishLarge && item.large_name ? item.large_name : item.name;
+                    const price = isDishLarge
+                      ? (isVip ? (item.large_price_vip ?? item.price_vip) : (item.large_price_regular ?? item.price_regular))
+                      : (isVip ? item.price_vip : item.price_regular);
+                    const diff = item.has_large
+                      ? (isVip
+                        ? (item.large_price_vip ?? item.price_vip) - item.price_vip
+                        : (item.large_price_regular ?? item.price_regular) - item.price_regular)
+                      : 0;
+
                     return (
-                      <div key={item.id} className="flex items-center gap-1.5">
+                      <div key={item.id} className="flex items-center gap-2 py-0.5">
+                        {/* Size toggle selector before quantity controls */}
+                        {item.has_large ? (
+                          <div className="flex bg-muted p-0.5 rounded-lg text-[9px] font-bold shrink-0" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => changeSizeMode('reg')}
+                              className={`px-1 py-0.5 rounded transition-all ${sizeMode === 'reg' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                              Reg
+                            </button>
+                            <button
+                              onClick={() => changeSizeMode('large')}
+                              className={`px-1 py-0.5 rounded transition-all ${sizeMode === 'large' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                              title={`Large option (+$${diff.toFixed(2)})`}
+                            >
+                              Lg (+${diff.toFixed(2)})
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-[84px] shrink-0" />
+                        )}
+
                         <button onClick={() => updateQty(dateKey, item.id, -1)} className="w-6 h-6 rounded bg-secondary flex items-center justify-center hover:bg-primary/20 shrink-0 transition-colors">
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -636,8 +697,8 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                         <button onClick={() => updateQty(dateKey, item.id, 1)} className="w-6 h-6 rounded bg-secondary flex items-center justify-center hover:bg-primary/20 shrink-0 transition-colors">
                           <Plus className="w-3.5 h-3.5" />
                         </button>
-                        <span className="text-sm truncate flex-1 min-w-0 text-foreground" title={item.name}>{item.name}</span>
-                        <span className="text-xs shrink-0 text-foreground">${(isVip ? item.price_vip : item.price_regular).toFixed(2)}</span>
+                        <span className="text-sm truncate flex-1 min-w-0 text-foreground" title={displayName}>{displayName}</span>
+                        <span className="text-xs shrink-0 text-foreground font-semibold">${Number(price).toFixed(2)}</span>
                       </div>
                     );
                   })}
@@ -655,16 +716,35 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       
       {/* Top Controls Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        {/* Child Selector */}
-        <select
-          value={selectedChildId}
-          onChange={(e) => setSelectedChildId(e.target.value)}
-          className="h-9 rounded-lg border border-input bg-card px-3 text-sm font-medium shadow-sm focus:ring-1 focus:ring-primary"
-        >
-          {childrenList.map(c => (
-            <option key={c.id} value={c.id}>{c.name} ({c.division})</option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Child Selector */}
+          <select
+            value={selectedChildId}
+            onChange={(e) => setSelectedChildId(e.target.value)}
+            className="h-9 rounded-lg border border-input bg-card px-3 text-sm font-medium shadow-sm focus:ring-1 focus:ring-primary"
+          >
+            {childrenList.map(c => (
+              <option key={c.id} value={c.id}>{c.name} ({c.division})</option>
+            ))}
+          </select>
+
+          {/* Global Size Mode Toggle */}
+          <div className="flex bg-muted p-0.5 rounded-lg text-xs font-semibold shadow-sm h-9 items-center">
+            <button
+              onClick={() => changeSizeMode('reg')}
+              className={`px-3 py-1 rounded-md h-8 transition-all ${sizeMode === 'reg' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Regular Size
+            </button>
+            <button
+              onClick={() => changeSizeMode('large')}
+              className={`px-3 py-1 rounded-md h-8 transition-all ${sizeMode === 'large' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              title={`Upgrade all eligible dishes to Large (+${isVip ? '$1.00' : '$1.50'})`}
+            >
+              Large Size (+${isVip ? '1.00' : '1.50'})
+            </button>
+          </div>
+        </div>
 
         {/* View Toggle */}
         <div className="flex items-center gap-2 bg-muted rounded-lg p-1 self-start sm:self-auto">
@@ -824,6 +904,17 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                           <div className="space-y-1.5">
                             {catDishes.map(dish => {
                               const isSelected = selectedPlannerDishes.includes(dish.id);
+                              const isDishLarge = sizeMode === 'large' && dish.has_large;
+                              const displayName = isDishLarge && dish.large_name ? dish.large_name : dish.name;
+                              const price = isDishLarge
+                                ? (isVip ? (dish.large_price_vip ?? dish.price_vip) : (dish.large_price_regular ?? dish.price_regular))
+                                : (isVip ? dish.price_vip : dish.price_regular);
+                              const diff = dish.has_large
+                                ? (isVip
+                                  ? (dish.large_price_vip ?? dish.price_vip) - dish.price_vip
+                                  : (dish.large_price_regular ?? dish.price_regular) - dish.price_regular)
+                                : 0;
+
                               return (
                                 <div
                                   key={dish.id}
@@ -839,9 +930,26 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                                 >
                                   <div className="cursor-grab text-muted-foreground">⠿</div>
                                   <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-bold truncate ${isSelected ? 'text-primary' : ''}`}>{dish.name}</p>
-                                    <p className="text-xs text-muted-foreground">${(isVip ? dish.price_vip : dish.price_regular).toFixed(2)}</p>
+                                    <p className={`text-sm font-bold truncate ${isSelected ? 'text-primary' : ''}`}>{displayName}</p>
+                                    <p className="text-xs text-muted-foreground">${Number(price).toFixed(2)}</p>
                                   </div>
+                                  {dish.has_large && (
+                                    <div className="flex bg-muted p-0.5 rounded-lg text-[9px] font-bold shrink-0" onClick={e => e.stopPropagation()}>
+                                      <button
+                                        onClick={() => changeSizeMode('reg')}
+                                        className={`px-1 py-0.5 rounded transition-all ${sizeMode === 'reg' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                      >
+                                        Reg
+                                      </button>
+                                      <button
+                                        onClick={() => changeSizeMode('large')}
+                                        className={`px-1 py-0.5 rounded transition-all ${sizeMode === 'large' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                        title={`Large option (+$${diff.toFixed(2)})`}
+                                      >
+                                        Lg (+${diff.toFixed(2)})
+                                      </button>
+                                    </div>
+                                  )}
                                   {isSelected && <span className="text-primary text-base">✓</span>}
                                 </div>
                               );
@@ -930,6 +1038,8 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                               {cartEntries.map(([dishId, qty]) => {
                                 const dish = dishes.find(d => d.id === dishId);
                                 if (!dish) return null;
+                                const isDishLarge = sizeMode === 'large' && dish.has_large;
+                                const displayName = isDishLarge && dish.large_name ? dish.large_name : dish.name;
                                 return (
                                   <div key={dishId} className="flex items-center gap-1 group">
                                     <span className={`text-[10px] leading-tight truncate flex-1 font-medium rounded px-1 ${
@@ -938,7 +1048,7 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                                       dish.category === 'drink' ? 'bg-blue-100 text-blue-800' :
                                       'bg-purple-100 text-purple-800'
                                     }`}>
-                                      {qty > 1 && <span className="font-bold">{qty}×</span>} {dish.name}
+                                      {qty > 1 && <span className="font-bold">{qty}×</span>} {displayName}
                                     </span>
                                     <button
                                       onClick={() => updateQty(dateKey, dishId, -1)}

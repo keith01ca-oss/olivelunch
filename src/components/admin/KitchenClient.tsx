@@ -19,11 +19,16 @@ interface Dish {
   prep_time_minutes?: number;
   cook_time_minutes?: number;
   pack_time_seconds?: number;
+  has_large?: boolean;
+  large_name?: string;
+  large_price_regular?: number;
+  large_price_vip?: number;
 }
 
 interface OrderItem {
   dish_id: string;
   quantity: number;
+  is_large?: boolean;
 }
 
 interface Order {
@@ -185,6 +190,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
             orderId: order.id,
             child: order.children,
             dishId: item.dish_id,
+            is_large: item.is_large,
             itemNumber: q + 1,
             totalQuantity: item.quantity
           });
@@ -206,24 +212,28 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
 
   // Aggregate Data
   const { mealTotals, ingredientTotals, totalPrepTime, totalCookTime, totalPackSeconds } = useMemo(() => {
+    // key is "dishId:isLarge"
     const mealMap: Record<string, number> = {};
     const ingMap: Record<string, { amount: number; unit: string }> = {};
     let prep = 0, cook = 0, packSeconds = 0;
 
     orders.forEach(order => {
       order.order_items.forEach((item: any) => {
-        mealMap[item.dish_id] = (mealMap[item.dish_id] || 0) + item.quantity;
+        const key = `${item.dish_id}:${!!item.is_large}`;
+        mealMap[key] = (mealMap[key] || 0) + item.quantity;
       });
     });
 
-    Object.entries(mealMap).forEach(([dishId, totalQty]) => {
+    Object.entries(mealMap).forEach(([key, totalQty]) => {
+      const [dishId, isLargeStr] = key.split(':');
+      const isLarge = isLargeStr === 'true';
       const dish = initialDishes.find(d => d.id === dishId);
       if (dish) {
         if (dish.ingredients) {
           dish.ingredients.forEach(ing => {
-            const key = `${ing.name}|${ing.unit}`;
-            if (!ingMap[key]) ingMap[key] = { amount: 0, unit: ing.unit };
-            ingMap[key].amount += (ing.amount * totalQty);
+            const ingKey = `${ing.name}|${ing.unit}`;
+            if (!ingMap[ingKey]) ingMap[ingKey] = { amount: 0, unit: ing.unit };
+            ingMap[ingKey].amount += (ing.amount * totalQty);
           });
         }
         prep += (dish.prep_time_minutes || 0);
@@ -559,29 +569,45 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   </div>
                   <div className="space-y-4">
                     {uniqueCategories.map(category => {
-                      const categoryDishes = initialDishes.filter(d => d.category === category && mealTotals[d.id] > 0);
-                      if (categoryDishes.length === 0) return null;
+                      const categoryMeals = Object.entries(mealTotals)
+                        .map(([key, qty]) => {
+                          const [dishId, isLargeStr] = key.split(':');
+                          const dish = initialDishes.find(d => d.id === dishId);
+                          return {
+                            key,
+                            qty,
+                            dish,
+                            isLarge: isLargeStr === 'true'
+                          };
+                        })
+                        .filter(m => m.dish && m.dish.category === category && m.qty > 0);
+
+                      if (categoryMeals.length === 0) return null;
                       return (
                         <div key={category} className="bg-card border rounded-xl overflow-hidden shadow-sm print:border-gray-400">
                           <div className="bg-muted/40 px-4 py-2 border-b font-bold uppercase tracking-wider text-xs">{category}</div>
                           <ul className="divide-y">
-                            {categoryDishes.map(dish => (
-                              <li key={dish.id} className="p-4 flex flex-col gap-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-bold text-lg">{dish.name}</span>
-                                  <span className="text-2xl font-black bg-primary/10 text-primary px-4 py-1 rounded-lg print:bg-transparent print:text-black print:border-2 print:border-black">{mealTotals[dish.id]}</span>
-                                </div>
-                                {dish.ingredients && dish.ingredients.length > 0 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {dish.ingredients.map(ing => (
-                                      <div key={ing.name} className="text-xs bg-muted border rounded-md px-2 py-1 font-medium">
-                                        <span className="text-primary font-bold mr-1">{ing.amount * mealTotals[dish.id]}</span> {ing.unit} {ing.name}
-                                      </div>
-                                    ))}
+                            {categoryMeals.map(({ key, qty, dish, isLarge }) => {
+                              const isItemLarge = isLarge && !!dish?.has_large;
+                              const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                              return (
+                                <li key={key} className="p-4 flex flex-col gap-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-lg">{displayName}</span>
+                                    <span className="text-2xl font-black bg-primary/10 text-primary px-4 py-1 rounded-lg print:bg-transparent print:text-black print:border-2 print:border-black">{qty}</span>
                                   </div>
-                                )}
-                              </li>
-                            ))}
+                                  {dish?.ingredients && dish.ingredients.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {dish.ingredients.map(ing => (
+                                        <div key={ing.name} className="text-xs bg-muted border rounded-md px-2 py-1 font-medium">
+                                          <span className="text-primary font-bold mr-1">{ing.amount * qty}</span> {ing.unit} {ing.name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       );
@@ -626,6 +652,8 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   const divKey = `${schoolName}::${labelInfo.child?.division || ''}`;
                   const color = divisionColors[divKey] || { bg: '#f9f9f9', border: '#aaa' };
                   const dish = initialDishes.find(d => d.id === labelInfo.dishId);
+                  const isItemLarge = !!labelInfo.is_large && !!dish?.has_large;
+                  const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
                   const printDate = selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                   // Sequential unique icon per school (guaranteed no collisions)
                   // ECS EC is always 'cross'; all other schools get sequential pictographic icons
@@ -674,7 +702,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                       {/* ROW 2: Dish Name + Time */}
                       <div className="label-row2 flex items-center justify-between font-bold text-[11px] overflow-hidden pl-3 mt-0.5">
                         <span className="truncate flex-1">
-                          {dish?.name} {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-muted-foreground ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}
+                          {displayName} {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-muted-foreground ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}
                         </span>
                         <span className="font-black shrink-0 ml-1 leading-none">{lunchTime}</span>
                       </div>
@@ -761,13 +789,18 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                       <div className="space-y-6 print:space-y-4">
                         {uniqueDivs.sort().map(div => {
                            const divOrders = schoolOrders.filter(o => o.children?.division === div);
-                           const color = divisionColors[div as string] || { bg: '#f9f9f9', border: '#ccc' };
+                           const color = divisionColors[`${schoolName}::${div}`] || { bg: '#f9f9f9', border: '#ccc' };
                            
-                           // Aggregate items
-                           const divTotals: Record<string, number> = {};
+                           // Aggregate items, separating large and regular versions
+                           // key format: "dishId:isLarge"
+                           const divTotals: Record<string, { qty: number; dishId: string; isLarge: boolean }> = {};
                            divOrders.forEach(o => {
                              o.order_items.forEach((item: any) => {
-                               divTotals[item.dish_id] = (divTotals[item.dish_id] || 0) + item.quantity;
+                               const key = `${item.dish_id}:${!!item.is_large}`;
+                               if (!divTotals[key]) {
+                                 divTotals[key] = { qty: 0, dishId: item.dish_id, isLarge: !!item.is_large };
+                               }
+                               divTotals[key].qty += item.quantity;
                              });
                            });
 
@@ -780,7 +813,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                  <h3 className="text-xl font-black print:text-xs print:font-bold">{div as string}</h3>
                                  <div className="flex gap-4 text-sm font-bold print:text-[9px] print:gap-2">
                                    <span>{divOrders.length} Students</span>
-                                   <span>{Object.values(divTotals).reduce((a, b) => a + b, 0)} Items</span>
+                                   <span>{Object.values(divTotals).reduce((sum, item) => sum + item.qty, 0)} Items</span>
                                  </div>
                                </div>
                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 print:p-3 print:grid-cols-2 print:gap-4">
@@ -792,18 +825,23 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                      </tr>
                                    </thead>
                                    <tbody className="divide-y print:divide-slate-200">
-                                     {Object.entries(divTotals).map(([dishId, qty]) => (
-                                       <tr key={dishId}>
-                                         <td className="py-2 print:py-1 font-semibold">{initialDishes.find(d => d.id === dishId)?.name}</td>
-                                         <td className="py-2 text-right font-black text-lg print:text-xs print:py-1">{qty}</td>
-                                       </tr>
-                                     ))}
+                                     {Object.entries(divTotals).map(([key, data]) => {
+                                       const dish = initialDishes.find(d => d.id === data.dishId);
+                                       const isItemLarge = data.isLarge && !!dish?.has_large;
+                                       const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                                       return (
+                                         <tr key={key}>
+                                           <td className="py-2 print:py-1 font-semibold">{displayName}</td>
+                                           <td className="py-2 text-right font-black text-lg print:text-xs print:py-1">{data.qty}</td>
+                                         </tr>
+                                       );
+                                     })}
                                    </tbody>
                                  </table>
 
                                  <div className="bg-muted/20 rounded-xl p-4 space-y-2 border border-dashed print:bg-transparent print:p-0 print:border-none print:space-y-1">
                                     <h4 className="text-[10px] font-black uppercase text-muted-foreground print:text-[8px] print:font-bold print:text-black">
-                                      Packing & Verification Checklist
+                                       Packing & Verification Checklist
                                     </h4>
                                     
                                     {/* Screen list of names */}
@@ -823,6 +861,8 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                          return divOrders.flatMap(o => 
                                            o.order_items.flatMap((item: any) => {
                                              const dish = initialDishes.find(d => d.id === item.dish_id);
+                                             const isItemLarge = !!item.is_large && !!dish?.has_large;
+                                             const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
                                              const itemsList = [];
                                              for (let i = 0; i < item.quantity; i++) {
                                                itemIdx++;
@@ -831,7 +871,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                                    <span className="inline-block w-3.5 text-center font-bold text-slate-400">{itemIdx}</span>
                                                    <span className="inline-block w-3 h-3 border border-slate-400 rounded-sm flex-shrink-0 mr-1" />
                                                    <span className="capitalize font-bold truncate max-w-[85px]">{o.children?.name}</span>
-                                                   <span className="text-slate-500 truncate flex-1">— {dish?.name}</span>
+                                                   <span className="text-slate-500 truncate flex-1">— {displayName}</span>
                                                  </div>
                                                );
                                              }

@@ -10,6 +10,7 @@ interface OrderItemRequest {
   dish_id: string;
   quantity: number;
   delivery_area: 'classroom' | 'office' | 'pickup';
+  is_large?: boolean;
 }
 
 interface OrderRequest {
@@ -129,7 +130,11 @@ export async function POST(req: NextRequest) {
            return NextResponse.json({ error: `VIP max 5 units per dish per child. Exceeded for ${dish.name}.` }, { status: 400 });
         }
 
-        const unitPrice = isVip ? Number(dish.price_vip) : Number(dish.price_regular);
+        const isItemLarge = !!item.is_large && !!dish.has_large;
+        const unitPrice = isItemLarge
+          ? (isVip ? Number(dish.large_price_vip ?? dish.price_vip) : Number(dish.large_price_regular ?? dish.price_regular))
+          : (isVip ? Number(dish.price_vip) : Number(dish.price_regular));
+
         const itemTotal = unitPrice * item.quantity;
         orderGross += itemTotal;
         totalGrossAmount += itemTotal;
@@ -140,7 +145,8 @@ export async function POST(req: NextRequest) {
           quantity: item.quantity,
           unit_price: unitPrice,
           total_price: itemTotal,
-          delivery_area: item.delivery_area
+          delivery_area: item.delivery_area,
+          is_large: isItemLarge
         });
       }
 
@@ -216,7 +222,8 @@ export async function POST(req: NextRequest) {
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_price: item.total_price,
-        delivery_area: item.delivery_area || 'classroom'
+        delivery_area: item.delivery_area || 'classroom',
+        is_large: item.is_large ?? false
       };
     });
 

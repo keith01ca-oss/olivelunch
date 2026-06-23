@@ -74,7 +74,8 @@ export async function GET(req: NextRequest) {
     .from('orders')
     .select(`
       id,
-      order_items (dish_id, quantity),
+      order_date,
+      order_items (dish_id, quantity, is_large),
       children (name, division, delivery_location, lunch_time, schools(name, school_routes(stop_order, routes(route_number))))
     `)
     .eq('order_date', date)
@@ -88,13 +89,19 @@ export async function GET(req: NextRequest) {
   // Fetch dishes
   const { data: dishes } = await supabaseAdmin
     .from('dishes')
-    .select('id, name')
+    .select('id, name, has_large, large_name')
     .eq('is_active', true)
     .is('deleted_at', null)
     .eq('org_id', orgId);
 
-  const dishMap: Record<string, string> = {};
-  (dishes || []).forEach((d: any) => { dishMap[d.id] = d.name; });
+  const dishMap: Record<string, { name: string; has_large: boolean; large_name: string | null }> = {};
+  (dishes || []).forEach((d: any) => {
+    dishMap[d.id] = {
+      name: d.name,
+      has_large: !!d.has_large,
+      large_name: d.large_name
+    };
+  });
 
   // --- Per-school division color map ---
   // Rule: within the SAME school, every division gets a distinct color.
@@ -159,6 +166,10 @@ export async function GET(req: NextRequest) {
     const division = order.children?.division || '';
     const divKey = `${schoolName}::${division}`;
     order.order_items.forEach((item: any) => {
+      const dishInfo = dishMap[item.dish_id];
+      const isLarge = !!item.is_large && !!dishInfo?.has_large;
+      const finalDishName = isLarge && dishInfo?.large_name ? dishInfo.large_name : (dishInfo?.name || '');
+
       for (let q = 0; q < item.quantity; q++) {
         labels.push({
           childName: order.children?.name || '',
@@ -170,7 +181,7 @@ export async function GET(req: NextRequest) {
           schoolIcon: schoolIconMap[schoolName] || 'heart',
           stopOrder: (order.children?.schools as any)?.school_routes?.[0]?.stop_order || 0,
           routeNumber: (order.children?.schools as any)?.school_routes?.[0]?.routes?.route_number || '',
-          dishName: dishMap[item.dish_id] || '',
+          dishName: finalDishName,
           itemNum: q + 1,
           totalQty: item.quantity,
           color: divColorMap[divKey] || '#888888',

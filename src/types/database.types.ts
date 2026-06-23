@@ -100,6 +100,10 @@ export interface Database {
           deleted_at: string | null
           created_at: string
           updated_at: string
+          has_large: boolean
+          large_name: string | null
+          large_price_regular: number | null
+          large_price_vip: number | null
         }
         Insert: {
           id?: string
@@ -112,6 +116,10 @@ export interface Database {
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
+          has_large?: boolean
+          large_name?: string | null
+          large_price_regular?: number | null
+          large_price_vip?: number | null
         }
         Update: {
           id?: string
@@ -124,6 +132,10 @@ export interface Database {
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
+          has_large?: boolean
+          large_name?: string | null
+          large_price_regular?: number | null
+          large_price_vip?: number | null
         }
       }
       orders: {

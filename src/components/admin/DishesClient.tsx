@@ -31,6 +31,10 @@ interface Dish {
   prep_time_minutes?: number;
   cook_time_minutes?: number;
   pack_time_seconds?: number;
+  has_large?: boolean;
+  large_name?: string;
+  large_price_regular?: number;
+  large_price_vip?: number;
 }
 
 const DEFAULT_CATEGORIES = ['main', 'side', 'snack', 'drink'];
@@ -49,7 +53,11 @@ const emptyForm = {
   overhead_costs: [] as Overhead[],
   prep_time_minutes: 0,
   cook_time_minutes: 0,
-  pack_time_seconds: 0
+  pack_time_seconds: 0,
+  has_large: false,
+  large_name: '',
+  large_price_regular: '',
+  large_price_vip: ''
 };
 
 export default function DishesClient({ initialDishes, orgSettings }: { initialDishes: Dish[], orgSettings?: any }) {
@@ -91,7 +99,11 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
       overhead_costs: d.overhead_costs || [],
       prep_time_minutes: d.prep_time_minutes || 0,
       cook_time_minutes: d.cook_time_minutes || 0,
-      pack_time_seconds: d.pack_time_seconds || 0
+      pack_time_seconds: d.pack_time_seconds || 0,
+      has_large: d.has_large || false,
+      large_name: d.large_name || '',
+      large_price_regular: d.large_price_regular ? String(d.large_price_regular) : '',
+      large_price_vip: d.large_price_vip ? String(d.large_price_vip) : ''
     }); 
     setShowForm(true); 
   };
@@ -119,6 +131,12 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
       toast.error('Please fill in Name, Category, and Prices.'); return; 
     }
     
+    if (form.has_large) {
+      if (!form.large_name.trim() || !form.large_price_regular || !form.large_price_vip) {
+        toast.error('Please fill in Large Name and Large Prices.'); return;
+      }
+    }
+    
     // Clean arrays
     const cleanIngredients = form.ingredients.filter(i => i.name.trim() !== '').map(i => ({...i, amount: Number(i.amount) || 0, cost_per_unit: Number(i.cost_per_unit) || 0}));
     const cleanOverheads = form.overhead_costs.filter(o => o.name.trim() !== '').map(o => ({...o, amount: Number(o.amount) || 0}));
@@ -138,7 +156,11 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
         overhead_costs: cleanOverheads,
         prep_time_minutes: Number(form.prep_time_minutes) || 0,
         cook_time_minutes: Number(form.cook_time_minutes) || 0,
-        pack_time_seconds: Number(form.pack_time_seconds) || 0
+        pack_time_seconds: Number(form.pack_time_seconds) || 0,
+        has_large: form.has_large,
+        large_name: form.has_large ? form.large_name.trim() : null,
+        large_price_regular: form.has_large && form.large_price_regular ? parseFloat(form.large_price_regular as string) : null,
+        large_price_vip: form.has_large && form.large_price_vip ? parseFloat(form.large_price_vip as string) : null,
       };
       const method = editing ? 'PUT' : 'POST';
       const url = editing ? `/api/admin/dishes/${editing.id}` : '/api/admin/dishes';
@@ -245,6 +267,34 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
                   <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({...f, is_active: e.target.checked}))} className="w-4 h-4 accent-primary" />
                   <span className="text-sm font-medium">Active (visible on parent menu)</span>
                 </label>
+
+                <label className="flex items-center gap-3 cursor-pointer p-3 border rounded-xl bg-muted/20">
+                  <input type="checkbox" checked={form.has_large} onChange={e => setForm(f => ({...f, has_large: e.target.checked}))} className="w-4 h-4 accent-primary" />
+                  <span className="text-sm font-medium">Has Large Option?</span>
+                </label>
+
+                {form.has_large && (
+                  <div className="p-4 border rounded-xl bg-primary/5 space-y-4 animate-fade-in-up">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Large Option Name</label>
+                      <input value={form.large_name} onChange={e => setForm(f => ({...f, large_name: e.target.value}))}
+                        className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none"
+                        placeholder="e.g. Signature Mac & Cheese (Large)" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Large Regular Price ($)</label>
+                        <input type="number" step="0.01" min="0" value={form.large_price_regular} onChange={e => setForm(f => ({...f, large_price_regular: e.target.value}))}
+                          className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none font-bold" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-primary">Large VIP Price ($)</label>
+                        <input type="number" step="0.01" min="0" value={form.large_price_vip} onChange={e => setForm(f => ({...f, large_price_vip: e.target.value}))}
+                          className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none font-bold text-primary" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </section>
 
               <section className="space-y-4">
@@ -417,7 +467,14 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
                             </button>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-medium">{dish.name}</td>
+                        <td className="px-6 py-4 font-medium flex items-center gap-2">
+                          <span>{dish.name}</span>
+                          {dish.has_large && (
+                            <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full dark:bg-emerald-900/30 dark:text-emerald-400">
+                              Lg Available
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4">${Number(dish.price_regular).toFixed(2)}</td>
                         <td className="px-6 py-4 text-primary font-semibold">${Number(dish.price_vip).toFixed(2)}</td>
                         <td className="px-6 py-4">

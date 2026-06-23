@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
         order_items (
           dish_id,
           quantity,
-          delivery_area
+          delivery_area,
+          is_large
         ),
         children (
           name,
