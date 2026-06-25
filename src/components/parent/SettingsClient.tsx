@@ -54,7 +54,7 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
 
   const handleProcessCancel = async (option: 'pay_difference' | 'cancel_meals') => {
     setProcessingCancel(true);
-    const res = await processVipCancellation(parent.id, option, cancelSummary?.subscriptionId || null);
+    const res = await processVipCancellation(parent.id, option, cancelSummary?.subscriptionId || null, window.location.origin);
     setProcessingCancel(false);
     if (res.error) {
       toast.error(res.error);
