@@ -101,6 +101,7 @@ export default async function ParentOrdersPage({
       order_date,
       status,
       gross_amount,
+      credit_used,
       total_amount,
       created_at,
       children ( id, name, division ),

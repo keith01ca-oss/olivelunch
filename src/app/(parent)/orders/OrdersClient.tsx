@@ -21,6 +21,7 @@ type Order = {
   order_date: string;
   status: string;
   gross_amount: number;
+  credit_used: number;
   total_amount: number;
   created_at: string;
   children: { id: string; name: string; division: string } | null;
@@ -245,8 +246,11 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
             const isCurrentMonth = group.year === currentYear && group.month === currentMonth;
             const monthPending = group.orders.filter(o => o.status === 'pending' && o.order_date > today);
             const monthPendingIds = monthPending.map(o => o.id);
+            const monthPendingGross = monthPending.reduce((s, o) => s + Number(o.gross_amount), 0);
+            const monthPendingCreditUsed = monthPending.reduce((s, o) => s + Number(o.credit_used || 0), 0);
             const monthPendingTotal = monthPending.reduce((s, o) => s + Number(o.total_amount), 0);
             const isPayLoading = loadingAction === 'pay-' + (monthPendingIds[0] ?? '');
+
 
             return (
               <div key={group.key} className="bg-card border rounded-2xl shadow-sm overflow-hidden">
@@ -282,14 +286,21 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
 
                   <div className="flex items-center gap-2 shrink-0">
                     {monthPending.length > 0 && (
-                      <button
-                        onClick={() => handlePayPending(monthPendingIds)}
-                        disabled={isPayLoading || isPending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold transition-colors disabled:opacity-60 shadow"
-                      >
-                        <CreditCard className="w-3.5 h-3.5" />
-                        {isPayLoading ? 'Processing…' : `Pay $${monthPendingTotal.toFixed(2)}`}
-                      </button>
+                      <div className="flex flex-col items-end gap-0.5">
+                        {monthPendingCreditUsed > 0 && (
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            ${monthPendingGross.toFixed(2)} - <span className="text-green-600">${monthPendingCreditUsed.toFixed(2)} credit</span>
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handlePayPending(monthPendingIds)}
+                          disabled={isPayLoading || isPending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold transition-colors disabled:opacity-60 shadow"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          {isPayLoading ? 'Processing…' : `Pay $${monthPendingTotal.toFixed(2)}`}
+                        </button>
+                      </div>
                     )}
                     <button
                       onClick={() => toggleMonth(group.key)}
