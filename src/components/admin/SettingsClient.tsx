@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, Plus, Trash2, Save, Loader2, Phone, Mail, Snowflake, PlayCircle } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, Loader2, Phone, Mail, Sun, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsClient({ org }: { org: any }) {
@@ -11,7 +11,7 @@ export default function SettingsClient({ org }: { org: any }) {
   const [contactEmail, setContactEmail] = useState<string>(org?.settings?.contact_email || '');
   const [contactWhatsapp, setContactWhatsapp] = useState<string>(org?.settings?.contact_whatsapp || '');
   const [isSaving, setIsSaving] = useState(false);
-  const [summerAction, setSummerAction] = useState<'pause' | 'resume' | null>(null);
+  const [summerAction, setSummerAction] = useState<'apply' | null>(null);
   const [summerResult, setSummerResult] = useState<string | null>(null);
 
   const handleSave = async () => {
@@ -42,24 +42,22 @@ export default function SettingsClient({ org }: { org: any }) {
     }
   };
 
-  const handleSummerPause = async (action: 'pause' | 'resume') => {
-    if (!confirm(`This will ${action} ALL active monthly VIP subscriptions on Stripe. Continue?`)) return;
-    setSummerAction(action);
+  const handleSummerCredit = async () => {
+    if (!confirm('This will manually add $9.99 store credit to all active monthly VIP subscribers. Continue?')) return;
+    setSummerAction('apply');
     setSummerResult(null);
     try {
-      const res = await fetch('/api/admin/vip-summer-pause', {
+      const res = await fetch('/api/admin/vip-summer-credit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const verb = action === 'pause' ? 'paused' : 'resumed';
-      const msg = `✅ ${data.affected} subscription(s) ${verb}${data.failed > 0 ? `, ${data.failed} failed` : ''}.`;
+      const msg = `✅ ${data.affected} monthly VIP(s) credited $9.99. ${data.skipped} skipped (already credited or not monthly), ${data.failed} failed.`;
       setSummerResult(msg + (data.errors?.length > 0 ? ` Errors: ${data.errors.join('; ')}` : ''));
       toast.success(msg);
     } catch (err: any) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || 'Failed to apply credits');
     } finally {
       setSummerAction(null);
     }
@@ -68,111 +66,112 @@ export default function SettingsClient({ org }: { org: any }) {
   return (
     <div className="space-y-8 max-w-4xl">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold flex items-center gap-2">
-            <Settings className="w-6 h-6 text-primary" /> System Settings
-          </h1>
-          <p className="text-muted-foreground">Manage your global categories, units, and system defaults.</p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-inner">
+            <Settings className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-foreground">Global Settings</h1>
+            <p className="text-sm font-semibold text-muted-foreground mt-0.5">Configure categories, measurement units, and contact info.</p>
+          </div>
         </div>
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+          className="flex items-center gap-2 bg-primary text-primary-foreground font-black px-6 py-3 rounded-2xl hover:bg-primary/95 transition-all shadow-md disabled:opacity-50 text-sm"
         >
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save Changes
+          Save Configuration
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Category Management */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <h2 className="font-bold text-primary uppercase tracking-wider text-sm">Menu Categories</h2>
-            <button 
-              onClick={() => setCategories([...categories, ''])}
-              className="p-1 hover:bg-primary/10 text-primary rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Categories Section */}
+        <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="border-b pb-2">
+            <h2 className="font-bold text-slate-800 uppercase tracking-wider text-sm">Menu Categories</h2>
+            <p className="text-xs text-muted-foreground mt-1">Define categories for menu planning (e.g. main, side, snack, drink).</p>
           </div>
-          <p className="text-xs text-muted-foreground">These appear in the "Category" dropdown when creating dishes.</p>
-          
-          <div className="space-y-2">
-            {categories.map((cat, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input 
-                  value={cat}
-                  onChange={(e) => {
-                    const next = [...categories];
-                    next[i] = e.target.value;
-                    setCategories(next);
-                  }}
-                  placeholder="Category name..."
-                  className="flex-1 h-10 rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background"
-                />
-                <button 
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c, i) => (
+              <div key={i} className="flex items-center gap-1 bg-muted/65 border pl-3 pr-1.5 py-1.5 rounded-xl text-sm font-medium">
+                <span>{c}</span>
+                <button
                   onClick={() => setCategories(categories.filter((_, idx) => idx !== i))}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Unit Management */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <h2 className="font-bold text-primary uppercase tracking-wider text-sm">Ingredient Units</h2>
-            <button 
-              onClick={() => setUnits([...units, ''])}
-              className="p-1 hover:bg-primary/10 text-primary rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground">These appear in the "Unit" dropdown for recipes.</p>
-
-          <div className="grid grid-cols-2 gap-2">
-            {units.map((unit, i) => (
-              <div key={i} className="flex items-center gap-1">
-                <input 
-                  value={unit}
-                  onChange={(e) => {
-                    const next = [...units];
-                    next[i] = e.target.value;
-                    setUnits(next);
-                  }}
-                  placeholder="Unit..."
-                  className="flex-1 h-9 rounded-lg border px-2 text-xs focus:ring-1 focus:ring-primary outline-none bg-background font-mono"
-                />
-                <button 
-                  onClick={() => setUnits(units.filter((_, idx) => idx !== i))}
-                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-1 rounded-lg text-muted-foreground hover:bg-muted-foreground/10 hover:text-destructive transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
           </div>
+          <div className="flex gap-2">
+            <input
+              placeholder="Add category..."
+              className="flex-1 h-10 rounded-xl border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background font-medium"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = e.currentTarget.value.trim();
+                  if (val && !categories.includes(val)) {
+                    setCategories([...categories, val]);
+                    e.currentTarget.value = '';
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Units Section */}
+        <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="border-b pb-2">
+            <h2 className="font-bold text-slate-800 uppercase tracking-wider text-sm">Measurement Units</h2>
+            <p className="text-xs text-muted-foreground mt-1">Specify units used for recipes, ingredients, and scaling.</p>
+          </div>
+          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pr-1">
+            {units.map((u, i) => (
+              <div key={i} className="flex items-center gap-1 bg-muted/65 border pl-3 pr-1.5 py-1.5 rounded-xl text-sm font-medium">
+                <span>{u}</span>
+                <button
+                  onClick={() => setUnits(units.filter((_, idx) => idx !== i))}
+                  className="p-1 rounded-lg text-muted-foreground hover:bg-muted-foreground/10 hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              placeholder="Add unit..."
+              className="flex-1 h-10 rounded-xl border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background font-medium"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = e.currentTarget.value.trim();
+                  if (val && !units.includes(val)) {
+                    setUnits([...units, val]);
+                    e.currentTarget.value = '';
+                  }
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Contact Info */}
-      <div className="bg-card border rounded-2xl p-6 shadow-sm space-y-4">
+      {/* Organization Contact Details */}
+      <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-6">
         <div className="border-b pb-2">
-          <h2 className="font-bold text-primary uppercase tracking-wider text-sm">Contact Information</h2>
-          <p className="text-xs text-muted-foreground mt-1">This phone number and email will be shown to users in their Settings → Contact Us page.</p>
+          <h2 className="font-bold text-slate-800 uppercase tracking-wider text-sm">Customer Support Contact Info</h2>
+          <p className="text-xs text-muted-foreground mt-1">These support details will be visible to parents on their Settings page.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-1">
             <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Support Phone</label>
             <input
               value={contactPhone}
               onChange={e => setContactPhone(e.target.value)}
-              placeholder="e.g. +1 (800) 123-4567"
+              placeholder="e.g. +1 (604) 123-4567"
               className="w-full h-10 rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background"
             />
           </div>
@@ -201,38 +200,31 @@ export default function SettingsClient({ org }: { org: any }) {
           </div>
         </div>
       </div>
-      {/* Summer VIP Pause Controls */}
-      <div className="bg-card border-2 border-blue-200 rounded-2xl p-6 shadow-sm space-y-4">
-        <div className="border-b border-blue-100 pb-2">
-          <h2 className="font-bold text-blue-700 uppercase tracking-wider text-sm flex items-center gap-2">
-            <Snowflake className="w-4 h-4" /> Summer VIP Pause (July & August)
+
+      {/* Summer VIP Credit Controls */}
+      <div className="bg-card border-2 border-amber-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="border-b border-amber-100 pb-2">
+          <h2 className="font-bold text-amber-700 uppercase tracking-wider text-sm flex items-center gap-2">
+            <Sun className="w-4 h-4 text-amber-500" /> Summer VIP Credit (July & August)
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Pause all monthly VIP Stripe subscriptions for summer break (no charges in July &amp; August). 
-            Cron auto-runs June 30 at 11 PM UTC and resumes September 1. Use these buttons to trigger manually.
+            Adds $9.99 store credit to all active monthly VIP subscribers for summer break (offsetting their July &amp; August monthly payments). 
+            Cron runs automatically on July 1 and August 1. Use this button to trigger manually.
           </p>
         </div>
         {summerResult && (
-          <div className="text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 px-4 py-2.5 rounded-xl">
+          <div className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2.5 rounded-xl">
             {summerResult}
           </div>
         )}
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => handleSummerPause('pause')}
+            onClick={handleSummerCredit}
             disabled={summerAction !== null}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 text-white font-bold text-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
-            {summerAction === 'pause' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Snowflake className="w-4 h-4" />}
-            Pause All (July–Aug)
-          </button>
-          <button
-            onClick={() => handleSummerPause('resume')}
-            disabled={summerAction !== null}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            {summerAction === 'resume' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-            Resume All (Sept)
+            {summerAction === 'apply' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gift className="w-4 h-4" />}
+            Apply Summer Credits (Manual)
           </button>
         </div>
       </div>

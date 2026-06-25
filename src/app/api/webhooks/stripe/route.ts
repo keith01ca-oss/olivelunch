@@ -270,27 +270,6 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case 'customer.subscription.updated': {
-        // Sync vip_paused flag when Stripe confirms pause or resume
-        const updatedSub = event.data.object as Stripe.Subscription;
-        const updatedCustomerId = updatedSub.customer as string;
-        const isPaused = !!(updatedSub as any).pause_collection;
-
-        const { data: pausedParent } = await supabaseAdmin
-          .from('parents')
-          .select('id')
-          .eq('stripe_customer_id', updatedCustomerId)
-          .single();
-
-        if (pausedParent) {
-          await supabaseAdmin
-            .from('parents')
-            .update({ vip_paused: isPaused })
-            .eq('id', pausedParent.id);
-        }
-        break;
-      }
-
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
