@@ -66,7 +66,7 @@ function sortMonths(groups: MonthGroup[], currentYear: number, currentMonth: num
   });
 }
 
-export default function OrdersClient({ orders: initialOrders, creditBalance }: { orders: Order[]; creditBalance: number }) {
+export default function OrdersClient({ orders: initialOrders, creditBalance, lockedCredit = 0 }: { orders: Order[]; creditBalance: number; lockedCredit?: number }) {
   const router = useRouter();
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -206,6 +206,11 @@ export default function OrdersClient({ orders: initialOrders, creditBalance }: {
         <div className={`bg-card border rounded-2xl px-4 py-3 shadow-sm ${creditBalance > 0 ? 'border-green-300 bg-green-50' : ''}`}>
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Account Credit</p>
           <p className={`text-2xl font-extrabold mt-1 ${creditBalance > 0 ? 'text-green-600' : ''}`}>${creditBalance.toFixed(2)}</p>
+          {lockedCredit > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">
+              (${lockedCredit.toFixed(2)} reserved for pending)
+            </p>
+          )}
           {creditBalance > 0 && <p className="text-xs text-green-600 font-medium mt-0.5">Auto-applied at checkout</p>}
         </div>
       </div>

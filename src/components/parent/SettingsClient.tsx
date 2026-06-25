@@ -251,6 +251,11 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
           <div>
             <p className="text-sm font-bold text-primary uppercase tracking-widest mb-1">Available Balance</p>
             <h2 className="text-5xl font-black text-foreground">${total.toFixed(2)}</h2>
+            {lockedCredit > 0 && (
+              <p className="text-xs text-muted-foreground mt-2 font-medium">
+                (${lockedCredit.toFixed(2)} reserved for pending orders)
+              </p>
+            )}
           </div>
           <CreditCard className="w-16 h-16 text-primary opacity-20" />
         </div>
@@ -259,28 +264,56 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
           <h3 className="font-bold text-lg mb-4">Transaction History</h3>
           {credits.length === 0 ? (
             <div className="text-center py-10 border rounded-2xl bg-muted/20 text-muted-foreground text-sm">No credit history found.</div>
-          ) : (
-            <div className="border rounded-2xl overflow-hidden bg-card">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-[10px] uppercase font-bold text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Source</th>
-                    <th className="px-4 py-3 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {credits.map(c => (
-                    <tr key={c.id}>
-                      <td className="px-4 py-3">{new Date(c.created_at).toLocaleString()}</td>
-                      <td className="px-4 py-3 capitalize font-medium">{c.source}</td>
-                      <td className="px-4 py-3 text-right font-bold text-green-600">+${Number(c.amount).toFixed(2)}</td>
+          ) : (() => {
+            // Build running balance from oldest to newest, then reverse for display
+            const sorted = [...credits].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            let running = 0;
+            const withBalance = sorted.map(c => {
+              running += Number(c.amount);
+              return { ...c, balance: running };
+            });
+            const displayRows = withBalance.reverse();
+            const sourceLabel = (src: string) => {
+              switch (src) {
+                case 'order_usage': return 'Credit Used';
+                case 'season_proration': return 'Season Proration';
+                case 'referral': return 'Referral Bonus';
+                case 'admin': return 'Admin Adjustment';
+                case 'refund': return 'Refund';
+                default: return src.replace(/_/g, ' ');
+              }
+            };
+            return (
+              <div className="border rounded-2xl overflow-hidden bg-card">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-[10px] uppercase font-bold text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Description</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                      <th className="px-4 py-3 text-right">Balance</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody className="divide-y">
+                    {displayRows.map(c => {
+                      const amt = Number(c.amount);
+                      const isDebit = amt < 0;
+                      return (
+                        <tr key={c.id}>
+                          <td className="px-4 py-3 text-muted-foreground">{new Date(c.created_at).toLocaleString()}</td>
+                          <td className="px-4 py-3 font-medium">{sourceLabel(c.source)}</td>
+                          <td className={`px-4 py-3 text-right font-bold ${isDebit ? 'text-red-500' : 'text-green-600'}`}>
+                            {isDebit ? `-$${Math.abs(amt).toFixed(2)}` : `+$${amt.toFixed(2)}`}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-foreground">${Math.max(0, c.balance).toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );

@@ -211,6 +211,11 @@ export default async function DashboardPage({
           <div>
             <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">Account Credit</h3>
             <p className="mt-2 text-4xl font-black text-foreground">${totalCredit.toFixed(2)}</p>
+            {lockedCredit > 0 && (
+              <p className="text-xs text-muted-foreground mt-1 font-semibold">
+                (${lockedCredit.toFixed(2)} reserved for pending orders)
+              </p>
+            )}
           </div>
           {totalCredit > 0 && <p className="text-sm font-bold text-primary mt-2">Automatically applied at checkout</p>}
         </div>

@@ -133,7 +133,7 @@ export default async function ParentOrdersPage({
           </div>
         )}
       </div>
-      <OrdersClient orders={(orders as any) || []} creditBalance={creditBalance} />
+      <OrdersClient orders={(orders as any) || []} creditBalance={creditBalance} lockedCredit={lockedCredit} />
     </div>
   );
 }
