@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, Plus, Trash2, Save, Loader2, Phone, Mail } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, Loader2, Phone, Mail, Snowflake, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsClient({ org }: { org: any }) {
@@ -11,6 +11,8 @@ export default function SettingsClient({ org }: { org: any }) {
   const [contactEmail, setContactEmail] = useState<string>(org?.settings?.contact_email || '');
   const [contactWhatsapp, setContactWhatsapp] = useState<string>(org?.settings?.contact_whatsapp || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [summerAction, setSummerAction] = useState<'pause' | 'resume' | null>(null);
+  const [summerResult, setSummerResult] = useState<string | null>(null);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -37,6 +39,29 @@ export default function SettingsClient({ org }: { org: any }) {
       toast.error(err.message || 'Failed to save settings');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSummerPause = async (action: 'pause' | 'resume') => {
+    if (!confirm(`This will ${action} ALL active monthly VIP subscriptions on Stripe. Continue?`)) return;
+    setSummerAction(action);
+    setSummerResult(null);
+    try {
+      const res = await fetch('/api/admin/vip-summer-pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const verb = action === 'pause' ? 'paused' : 'resumed';
+      const msg = `✅ ${data.affected} subscription(s) ${verb}${data.failed > 0 ? `, ${data.failed} failed` : ''}.`;
+      setSummerResult(msg);
+      toast.success(msg);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed');
+    } finally {
+      setSummerAction(null);
     }
   };
 
@@ -174,6 +199,41 @@ export default function SettingsClient({ org }: { org: any }) {
             />
             <p className="text-[10px] text-muted-foreground">Enter in international format: +16041234567. This is the number users will WhatsApp.</p>
           </div>
+        </div>
+      </div>
+      {/* Summer VIP Pause Controls */}
+      <div className="bg-card border-2 border-blue-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="border-b border-blue-100 pb-2">
+          <h2 className="font-bold text-blue-700 uppercase tracking-wider text-sm flex items-center gap-2">
+            <Snowflake className="w-4 h-4" /> Summer VIP Pause (July & August)
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Pause all monthly VIP Stripe subscriptions for summer break (no charges in July &amp; August). 
+            Cron auto-runs June 30 at 11 PM UTC and resumes September 1. Use these buttons to trigger manually.
+          </p>
+        </div>
+        {summerResult && (
+          <div className="text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 px-4 py-2.5 rounded-xl">
+            {summerResult}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => handleSummerPause('pause')}
+            disabled={summerAction !== null}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {summerAction === 'pause' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Snowflake className="w-4 h-4" />}
+            Pause All (July–Aug)
+          </button>
+          <button
+            onClick={() => handleSummerPause('resume')}
+            disabled={summerAction !== null}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors disabled:opacity-50"
+          >
+            {summerAction === 'resume' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+            Resume All (Sept)
+          </button>
         </div>
       </div>
     </div>

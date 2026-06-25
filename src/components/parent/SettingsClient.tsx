@@ -414,10 +414,25 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
   const renderVip = () => {
     const isVip = parent?.is_vip || false;
     const isCancelled = parent?.vip_cancel_at_period_end || false;
+    const isPaused = parent?.vip_paused || false;
     const cancelDate = parent?.vip_cancel_at ? new Date(parent.vip_cancel_at).toLocaleDateString() : '';
 
     return (
       <div className="space-y-6">
+        {/* Summer Pause Banner */}
+        {isVip && isPaused && (
+          <div className="flex items-start gap-3 bg-blue-50 border-2 border-blue-200 rounded-2xl px-5 py-4">
+            <span className="text-2xl mt-0.5">❄️</span>
+            <div>
+              <p className="font-black text-blue-800 text-base">Subscription Paused for Summer Break</p>
+              <p className="text-sm text-blue-700 font-medium mt-1">
+                Your VIP subscription is paused for July & August — no charges will occur.
+                Billing automatically resumes on <strong>September 1</strong> and your VIP benefits will continue as normal.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gradient-to-br from-amber-500/15 to-amber-500/5 border border-amber-500/30 rounded-3xl p-6 md:p-8 relative overflow-hidden">
           <div className="absolute -right-8 -top-8 opacity-10">
             <Star className="w-40 h-40 text-amber-500 fill-amber-500" />
@@ -441,19 +456,25 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
                 </div>
               ) : (
                 <div>
-                  <h3 className="text-3xl font-black text-slate-900">You are an active VIP Member!</h3>
+                  <h3 className="text-3xl font-black text-slate-900">
+                    {isPaused ? 'VIP Member — Summer Pause Active' : 'You are an active VIP Member!'}
+                  </h3>
                   <p className="text-slate-700 mt-2 font-semibold">
-                    Enjoying discount pricing on every single order, priority support, and sick day protection.
+                    {isPaused
+                      ? 'Your subscription is paused for the summer. VIP discounts remain active on any orders placed. Billing resumes September 1.'
+                      : 'Enjoying discount pricing on every single order, priority support, and sick day protection.'}
                   </p>
                   <div className="mt-6 pt-4 border-t border-amber-500/20 flex flex-wrap gap-4 items-center justify-between">
                     <p className="text-xs font-bold text-slate-500">Subscription manages automatically via Stripe.</p>
-                    <button
-                      onClick={handleOpenCancelModal}
-                      disabled={loadingSummary}
-                      className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-black text-white hover:bg-slate-800 transition-all shadow-md disabled:opacity-50"
-                    >
-                      {loadingSummary ? 'Checking Summary...' : 'Cancel VIP Membership'}
-                    </button>
+                    {!isPaused && (
+                      <button
+                        onClick={handleOpenCancelModal}
+                        disabled={loadingSummary}
+                        className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-black text-white hover:bg-slate-800 transition-all shadow-md disabled:opacity-50"
+                      >
+                        {loadingSummary ? 'Checking Summary...' : 'Cancel VIP Membership'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )

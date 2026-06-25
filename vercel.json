@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/vip-pause",
+      "schedule": "0 23 30 6 *"
+    },
+    {
+      "path": "/api/cron/vip-resume",
+      "schedule": "0 8 1 9 *"
+    }
+  ]
+}
