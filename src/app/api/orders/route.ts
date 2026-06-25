@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
         credit_used: orderCredit,
         total_amount: o.gross_amount - orderCredit, // coupon is technically a total discount, we simplify here
         coupon_id: couponId,
-        status: 'pending'
+        status: 'pending' as const
       };
     });
 
@@ -254,7 +254,11 @@ export async function POST(req: NextRequest) {
       }
 
       if (couponId) {
-        await supabaseAdmin.rpc('increment_coupon_usage', { p_coupon_id: couponId }).catch(() => {});
+        try {
+          await supabaseAdmin.rpc('increment_coupon_usage' as any, { p_coupon_id: couponId });
+        } catch (e) {
+          console.warn('Failed to increment coupon usage:', e);
+        }
       }
 
       return NextResponse.json({ success: true, stripe_url: null });

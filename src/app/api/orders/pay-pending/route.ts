@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     .from('orders')
     .select('id, parent_id, status, order_date, gross_amount, credit_used, total_amount')
     .in('id', order_ids)
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || '')
     .eq('status', 'pending');
 
   if (error || !orders || orders.length === 0) {
@@ -46,23 +46,42 @@ export async function POST(req: NextRequest) {
   const { data: creditRows } = await supabaseAdmin
     .from('credits')
     .select('amount')
-    .eq('parent_id', parentId);
+    .eq('parent_id', parentId || '');
   const creditBalance = creditRows ? creditRows.reduce((sum, r) => sum + Number(r.amount), 0) : 0;
 
-  // Calculate total amount due (total_amount is what was originally owed after credit was applied during order creation)
-  // For pay-pending, just sum the total_amounts as they were set
-  const totalDue = validOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+  // The total value of the orders being paid is the sum of their gross_amounts
+  const totalGross = validOrders.reduce((sum, o) => sum + Number(o.gross_amount), 0);
 
-  // Apply additional credit if available
-  const creditToUse = Math.min(creditBalance, totalDue);
-  const finalAmount = Math.max(0, totalDue - creditToUse);
+  // Apply credit if available
+  const creditToUse = Math.min(creditBalance, totalGross);
+  const finalAmount = Math.max(0, totalGross - creditToUse);
 
   // If fully covered by credit, mark paid immediately
   if (finalAmount === 0) {
-    await supabaseAdmin.from('orders').update({ status: 'paid' }).in('id', validOrders.map(o => o.id));
+    let remainingCreditToDistribute = creditToUse;
+    for (let idx = 0; idx < validOrders.length; idx++) {
+      const o = validOrders[idx];
+      const orderFraction = o.gross_amount / totalGross;
+      const orderCredit = idx === validOrders.length - 1
+        ? remainingCreditToDistribute
+        : Number((creditToUse * orderFraction).toFixed(2));
+      
+      remainingCreditToDistribute -= orderCredit;
+      const newTotalAmount = o.gross_amount - orderCredit;
+
+      await supabaseAdmin
+        .from('orders')
+        .update({
+          status: 'paid',
+          credit_used: orderCredit,
+          total_amount: newTotalAmount
+        })
+        .eq('id', o.id);
+    }
+
     if (creditToUse > 0) {
       await supabaseAdmin.from('credits').insert({
-        parent_id: parentId,
+        parent_id: parentId || '',
         amount: -creditToUse,
         source: 'order_usage',
         order_id: validOrders[0].id,
@@ -91,17 +110,33 @@ export async function POST(req: NextRequest) {
     success_url: `${req.headers.get('origin')}/orders?success=true&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${req.headers.get('origin')}/orders?canceled=true`,
     metadata: {
-      parentId,
+      parentId: parentId || '',
       creditToUse: creditToUse.toString(),
       isBulkOrder: 'true',
     },
   });
 
-  // Tag all valid pending orders with the new session ID
-  await supabaseAdmin
-    .from('orders')
-    .update({ stripe_session_id: session.id })
-    .in('id', validOrders.map(o => o.id));
+  // Tag all valid pending orders with the new session ID and update their credit/total_amount values
+  let remainingCreditToDistribute = creditToUse;
+  for (let idx = 0; idx < validOrders.length; idx++) {
+    const o = validOrders[idx];
+    const orderFraction = o.gross_amount / totalGross;
+    const orderCredit = idx === validOrders.length - 1
+      ? remainingCreditToDistribute
+      : Number((creditToUse * orderFraction).toFixed(2));
+    
+    remainingCreditToDistribute -= orderCredit;
+    const newTotalAmount = o.gross_amount - orderCredit;
+
+    await supabaseAdmin
+      .from('orders')
+      .update({
+        stripe_session_id: session.id,
+        credit_used: orderCredit,
+        total_amount: newTotalAmount
+      })
+      .eq('id', o.id);
+  }
 
   return NextResponse.json({ success: true, stripe_url: session.url });
 }

@@ -75,7 +75,7 @@ export default async function AdminOrdersPage({
         <p className="text-muted-foreground mt-1">View and manage all lunch orders.</p>
       </div>
       <OrdersClient 
-        initialOrders={orders || []} 
+        initialOrders={(orders || []) as any} 
         orgId={orgId}
         dishes={dishes || []}
         childrenList={children || []}

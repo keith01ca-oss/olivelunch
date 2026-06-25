@@ -46,7 +46,7 @@ export async function getVipCancellationSummary(parentId: string) {
 
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
-        subscriptionEnd = new Date(sub.current_period_end * 1000);
+        subscriptionEnd = new Date((sub as any).current_period_end * 1000);
       }
     }
 
@@ -174,7 +174,7 @@ export async function processVipCancellation(
     if (subId) {
       try {
         const sub = await stripe.subscriptions.retrieve(subId);
-        periodEnd = new Date(sub.current_period_end * 1000);
+        periodEnd = new Date((sub as any).current_period_end * 1000);
       } catch (e) {
         console.warn('Failed to retrieve stripe subscription:', e);
         periodEnd = summary.subscriptionEnd ? new Date(summary.subscriptionEnd) : new Date();

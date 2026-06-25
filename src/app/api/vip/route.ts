@@ -3,7 +3,7 @@ import { getResolvedParent } from '@/lib/auth';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-04-10',
+  apiVersion: '2024-04-10' as any,
 });
 
 export async function POST(req: NextRequest) {
@@ -22,13 +22,13 @@ export async function POST(req: NextRequest) {
     
     let priceId = '';
     if (plan === 'yearly') {
-      priceId = isTestMode 
+      priceId = (isTestMode 
         ? (process.env.STRIPE_YEARLY_PRICE_ID_TEST || process.env.STRIPE_VIP_YEARLY_PRICE_ID_TEST || process.env.STRIPE_YEARLY_PRICE_ID || process.env.STRIPE_VIP_YEARLY_PRICE_ID)
-        : (process.env.STRIPE_YEARLY_PRICE_ID_LIVE || process.env.STRIPE_VIP_YEARLY_PRICE_ID_LIVE || process.env.STRIPE_YEARLY_PRICE_ID || process.env.STRIPE_VIP_YEARLY_PRICE_ID);
+        : (process.env.STRIPE_YEARLY_PRICE_ID_LIVE || process.env.STRIPE_VIP_YEARLY_PRICE_ID_LIVE || process.env.STRIPE_YEARLY_PRICE_ID || process.env.STRIPE_VIP_YEARLY_PRICE_ID)) || '';
     } else {
-      priceId = isTestMode
+      priceId = (isTestMode
         ? (process.env.STRIPE_MONTHLY_PRICE_ID_TEST || process.env.STRIPE_VIP_MONTHLY_PRICE_ID_TEST || process.env.STRIPE_VIP_MONTHLY_PRICE_ID || process.env.STRIPE_MONTHLY_PRICE_ID)
-        : (process.env.STRIPE_MONTHLY_PRICE_ID_LIVE || process.env.STRIPE_VIP_MONTHLY_PRICE_ID_LIVE || process.env.STRIPE_VIP_MONTHLY_PRICE_ID || process.env.STRIPE_MONTHLY_PRICE_ID);
+        : (process.env.STRIPE_MONTHLY_PRICE_ID_LIVE || process.env.STRIPE_VIP_MONTHLY_PRICE_ID_LIVE || process.env.STRIPE_VIP_MONTHLY_PRICE_ID || process.env.STRIPE_MONTHLY_PRICE_ID)) || '';
     }
 
     if (!priceId) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       mode: 'subscription',
       success_url: `${new URL(req.url).origin}/dashboard?vip_success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${new URL(req.url).origin}/vip?canceled=true`,
-      client_reference_id: parentId,
+      client_reference_id: parentId || undefined,
       metadata: {
         is_vip_subscription: 'true',
         parent_id: parentId

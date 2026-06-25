@@ -110,7 +110,8 @@ export default function ParentsClient({ parents: initialParents }: { parents: Pa
     
     if (res.error) return alert(res.error);
     
-    alert(`Success! Sent ${res.sent} emails. ${res.failed > 0 ? `(${res.failed} failed)` : ''}`);
+    const { sent = 0, failed = 0 } = res as any;
+    alert(`Success! Sent ${sent} emails. ${failed > 0 ? `(${failed} failed)` : ''}`);
     setShowEmailModal(false);
     setEmailSubject('');
     setEmailBody('');

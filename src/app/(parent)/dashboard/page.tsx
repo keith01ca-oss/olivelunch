@@ -24,7 +24,7 @@ export default async function DashboardPage({
   const { data: parent } = await supabaseAdmin
     .from('parents')
     .select('name, is_vip, referral_code')
-    .eq('id', parentId)
+    .eq('id', parentId || '')
     .single();
 
   // Optimistic VIP state from Stripe redirect & Verification
@@ -51,7 +51,7 @@ export default async function DashboardPage({
             vip_cancel_at: null,
             vip_cancel_at_period_end: false
           })
-          .eq('id', parentId);
+          .eq('id', parentId || '');
           
         isVip = true;
       }
@@ -85,7 +85,7 @@ export default async function DashboardPage({
             const { data: existingCredit } = await supabaseAdmin.from('credits').select('id').eq('order_id', orders[0].id);
             if (!existingCredit || existingCredit.length === 0) {
               await supabaseAdmin.from('credits').insert({
-                parent_id: parentId,
+                parent_id: parentId || '',
                 amount: -creditToUse,
                 source: 'order_usage',
                 order_id: orders[0].id
@@ -94,7 +94,11 @@ export default async function DashboardPage({
           }
           if (couponId) {
             // Increment coupon usage. We use RPC if possible or ignore as webhook will catch it
-            await supabaseAdmin.rpc('increment_coupon_usage', { p_coupon_id: couponId }).catch(() => {});
+            try {
+              await supabaseAdmin.rpc('increment_coupon_usage' as any, { p_coupon_id: couponId });
+            } catch (e) {
+              console.warn('Failed to increment coupon usage:', e);
+            }
           }
         }
       }

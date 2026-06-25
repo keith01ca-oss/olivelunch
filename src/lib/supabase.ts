@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/types/database.types';
+
+export type Database = any;
 
 // The Supabase Admin Client using the service_role key.
 // This bypasses RLS and should ONLY be used server-side, 

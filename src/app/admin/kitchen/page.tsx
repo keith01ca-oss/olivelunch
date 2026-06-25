@@ -11,7 +11,7 @@ export default async function KitchenPrepPage({ searchParams }: { searchParams: 
   // Fetch active dishes for mapping
   const { data: dishes } = await supabaseAdmin
     .from('dishes')
-    .select('id, name, category, recipe_url, ingredients, prep_time_minutes, cook_time_minutes, pack_time_seconds')
+    .select('id, name, category, recipe_url, ingredients, prep_time_minutes, cook_time_minutes, pack_time_seconds, has_large, large_name')
     .eq('is_active', true)
     .is('deleted_at', null)
     .eq('org_id', orgId);

@@ -38,7 +38,7 @@ export default async function UserSettingsPage({
               dishes ( price_regular, price_vip, large_price_regular, large_price_vip, has_large )
             )
           `)
-          .eq('parent_id', parentId)
+          .eq('parent_id', parentId || '')
           .eq('status', 'paid')
           .gte('order_date', todayStr);
 
@@ -80,7 +80,7 @@ export default async function UserSettingsPage({
           stripe_subscription_id: null,
           vip_cancel_at: null,
           vip_cancel_at_period_end: false,
-        }).eq('id', parentId);
+        }).eq('id', parentId || '');
 
         shouldRedirect = true;
       }
@@ -97,14 +97,14 @@ export default async function UserSettingsPage({
   const { data: parent } = await supabaseAdmin
     .from('parents')
     .select('id, name, email, is_vip, referral_code')
-    .eq('id', parentId)
+    .eq('id', parentId || '')
     .single();
 
   // Fetch Children
   const { data: children } = await supabaseAdmin
     .from('children')
     .select('id, name, division, school_id, delivery_location, lunch_time, schools(name)')
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || '')
     .is('deleted_at', null);
 
   // Fetch Schools for the add/edit child form
@@ -118,7 +118,7 @@ export default async function UserSettingsPage({
   const { data: credits } = await supabaseAdmin
     .from('credits')
     .select('id, amount, source, created_at')
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || '')
     .order('created_at', { ascending: false });
 
   // Fetch Org Contact Info

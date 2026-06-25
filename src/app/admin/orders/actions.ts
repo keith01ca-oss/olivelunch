@@ -107,7 +107,7 @@ export async function createOrderAdmin(data: {
   order_date: string;
   parent_id: string;
   child_id: string;
-  items: { dish_id: string; quantity: number; unit_price: number; total_price: number }[];
+  items: { dish_id: string; quantity: number; unit_price: number; total_price: number; is_large?: boolean }[];
   gross_amount: number;
   total_amount: number;
   org_id: string;

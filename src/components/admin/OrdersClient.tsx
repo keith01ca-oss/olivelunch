@@ -18,7 +18,8 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
-  dishes: { id: string; name: string; category: string } | null;
+  is_large?: boolean;
+  dishes: { id: string; name: string; category: string; large_name?: string | null } | null;
 }
 
 interface Order {
@@ -230,7 +231,11 @@ export default function OrdersClient({
             ${li.route ? `Route ${li.route}` : 'No Route'} - ${li.school}
           </div>
           <div class="row dish-row">
-            ${li.item.quantity}x ${li.item.dishes?.name || ''}
+            ${li.item.quantity}x ${(() => {
+              const isLarge = !!li.item.is_large && !!li.item.dishes?.large_name;
+              const displayName = isLarge ? li.item.dishes.large_name : (li.item.dishes?.name || '');
+              return displayName + (isLarge ? ' <span style="color: #d43b3b; font-weight: bold;">( Lg )</span>' : '');
+            })()}
           </div>
         </div>`).join('')}</div></div><script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script></body></html>`;
     const win = window.open('', '_blank');
@@ -268,7 +273,11 @@ export default function OrdersClient({
       }
 
       o.order_items.forEach(item => {
-        const dishName = item.dishes?.name || 'Unknown Dish';
+        const isLarge = !!item.is_large && !!item.dishes?.large_name;
+        let dishName = (isLarge && item.dishes?.large_name) ? item.dishes.large_name : (item.dishes?.name || 'Unknown Dish');
+        if (isLarge) {
+          dishName += ' <span style="color: #d43b3b; font-weight: bold;">( Lg )</span>';
+        }
         manifest[routeName].stops[stopKey].dishes[dishName] = (manifest[routeName].stops[stopKey].dishes[dishName] || 0) + item.quantity;
       });
     });

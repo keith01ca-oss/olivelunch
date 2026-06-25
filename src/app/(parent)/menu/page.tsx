@@ -23,14 +23,14 @@ export default async function MenuPage({ searchParams }: { searchParams: { child
   const { data: parent } = await supabaseAdmin
     .from('parents')
     .select('is_vip')
-    .eq('id', authContext.parentId)
+    .eq('id', authContext.parentId || '')
     .single();
 
   // Fetch children
   const { data: children } = await supabaseAdmin
     .from('children')
     .select('*')
-    .eq('parent_id', authContext.parentId)
+    .eq('parent_id', authContext.parentId || '')
     .is('deleted_at', null);
 
   if (!children || children.length === 0) {
@@ -76,7 +76,7 @@ export default async function MenuPage({ searchParams }: { searchParams: { child
       status,
       order_items ( id, quantity, dishes ( id, name, category ) )
     `)
-    .eq('parent_id', authContext.parentId)
+    .eq('parent_id', authContext.parentId || '')
     .eq('status', 'paid');
 
   return (

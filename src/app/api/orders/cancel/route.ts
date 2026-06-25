@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     .from('orders')
     .select('id, parent_id, status, order_date, total_amount, gross_amount, credit_used')
     .eq('id', order_id)
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || '')
     .single();
 
   if (error || !order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (order.status === 'paid') {
     const refundAmount = Number(order.gross_amount);
     const { error: creditError } = await supabaseAdmin.from('credits').insert({
-      parent_id: parentId,
+      parent_id: parentId || '',
       amount: refundAmount,
       source: 'refund',  // must match DB enum: 'referral'|'coupon'|'refund'|'manual'|'season_proration'|'order_usage'
       order_id: order.id,

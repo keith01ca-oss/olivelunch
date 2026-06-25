@@ -7,7 +7,7 @@ export async function submitSuggestion(parentId: string, content: string) {
   if (!content.trim()) return { error: 'Content cannot be empty' };
 
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await (supabaseAdmin as any)
       .from('suggestions')
       .insert([{ parent_id: parentId, content }]);
 

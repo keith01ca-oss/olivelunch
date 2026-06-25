@@ -53,7 +53,7 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
   }
 
   // 2. Extract Role (from Clerk Session Claims)
-  const role = (session.sessionClaims?.metadata?.role as UserRole) || 'parent';
+  const role = ((session.sessionClaims?.metadata as any)?.role as UserRole) || 'parent';
 
   // 3. Resolve parent_id from clerk_user_id
   const { data: parent, error } = await supabaseAdmin

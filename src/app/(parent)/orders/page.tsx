@@ -47,13 +47,13 @@ export default async function ParentOrdersPage({
             const { count } = await supabaseAdmin
               .from('credits')
               .select('*', { count: 'exact', head: true })
-              .eq('parent_id', parentId)
+              .eq('parent_id', parentId || '')
               .eq('source', 'order_usage')
               .eq('order_id', pendingOrders[0].id);
 
             if (!count || count === 0) {
               await supabaseAdmin.from('credits').insert({
-                parent_id: parentId,
+                parent_id: parentId || '',
                 amount: -creditToUse,
                 source: 'order_usage',
                 order_id: pendingOrders[0].id,
@@ -72,7 +72,7 @@ export default async function ParentOrdersPage({
   await supabaseAdmin
     .from('orders')
     .update({ status: 'cancelled' })
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || '')
     .eq('status', 'pending')
     .lte('order_date', today);
 
@@ -80,7 +80,7 @@ export default async function ParentOrdersPage({
   const { data: creditRows } = await supabaseAdmin
     .from('credits')
     .select('amount')
-    .eq('parent_id', parentId);
+    .eq('parent_id', parentId || '');
   const creditBalance = creditRows ? creditRows.reduce((sum, c) => sum + Number(c.amount), 0) : 0;
 
   // ── Fetch all orders ─────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ export default async function ParentOrdersPage({
         dishes ( id, name, category )
       )
     `)
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || '')
     .order('order_date', { ascending: false });
 
   return (

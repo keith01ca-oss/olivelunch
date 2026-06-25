@@ -439,6 +439,10 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
 
             /* Hide screen-only decorations */
             .label-color-strip { display: none !important; }
+            .avery-label .large-indicator {
+              color: #d43b3b !important;
+              font-weight: 900 !important;
+            }
           }
         `}} />
       )}
@@ -748,7 +752,10 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                       {/* ROW 2: Dish Name + Time */}
                       <div className="label-row2 flex items-center justify-between font-bold text-[11px] overflow-hidden pl-3 mt-0.5">
                         <span className="truncate flex-1">
-                          {displayName} {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-muted-foreground ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}
+                          {displayName}
+                          {isItemLarge && <span className="large-indicator text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
+                          {' '}
+                          {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-muted-foreground ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}
                         </span>
                         <span className="font-black shrink-0 ml-1 leading-none">{lunchTime}</span>
                       </div>
@@ -877,7 +884,10 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                        const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
                                        return (
                                          <tr key={key}>
-                                           <td className="py-2 print:py-1 font-semibold">{displayName}</td>
+                                           <td className="py-2 print:py-1 font-semibold">
+                                             {displayName}
+                                             {isItemLarge && <span className="text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
+                                           </td>
                                            <td className="py-2 text-right font-black text-lg print:text-xs print:py-1">{data.qty}</td>
                                          </tr>
                                        );
@@ -917,7 +927,10 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                                    <span className="inline-block w-3.5 text-center font-bold text-slate-400">{itemIdx}</span>
                                                    <span className="inline-block w-3 h-3 border border-slate-400 rounded-sm flex-shrink-0 mr-1" />
                                                    <span className="capitalize font-bold truncate max-w-[85px]">{o.children?.name}</span>
-                                                   <span className="text-slate-500 truncate flex-1">— {displayName}</span>
+                                                   <span className="text-slate-500 truncate flex-1">
+                                                     — {displayName}
+                                                     {isItemLarge && <span className="text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
+                                                   </span>
                                                  </div>
                                                );
                                              }

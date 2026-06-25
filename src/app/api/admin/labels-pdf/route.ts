@@ -184,6 +184,7 @@ export async function GET(req: NextRequest) {
           itemNum: q + 1,
           totalQty: item.quantity,
           color: divColorMap[divKey] || '#888888',
+          isLarge,
         });
       }
     });
@@ -290,10 +291,18 @@ export async function GET(req: NextRequest) {
 
     doc.save()
       .font('Helvetica-Bold')
-      .fontSize(7.5)
-      .fillColor('black')
-      .text(dishText, x + padL, y + padT + 11.5, { width: textW - 25, ellipsis: true, lineBreak: false })
-      .restore();
+      .fontSize(7.5);
+
+    if (label.isLarge) {
+      doc.fillColor('black')
+         .text(dishText + ' ', x + padL, y + padT + 11.5, { continued: true, width: textW - 40, ellipsis: true })
+         .fillColor('#d43b3b') // red color
+         .text('( Lg )');
+    } else {
+      doc.fillColor('black')
+         .text(dishText, x + padL, y + padT + 11.5, { width: textW - 25, ellipsis: true, lineBreak: false });
+    }
+    doc.restore();
 
     doc.save()
       .font('Helvetica-Bold')
@@ -565,7 +574,7 @@ export async function GET(req: NextRequest) {
     doc.on('end', () => resolve(Buffer.concat(buffers)));
   });
 
-  return new NextResponse(pdfBuffer, {
+  return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="labels-${date}.pdf"`,
