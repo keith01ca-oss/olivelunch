@@ -51,6 +51,67 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         
+        // Handle VIP difference payment — finalize cancellation after payment confirmed
+        if (session.metadata?.action === 'vip_cancel_difference') {
+          const parentId = session.metadata.parentId;
+          const subId = session.metadata.subId;
+          if (parentId) {
+            // 1. Fetch paid future orders (from today onwards) and revert their prices to regular
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+            const { data: futureOrders } = await supabaseAdmin
+              .from('orders')
+              .select(`
+                id, gross_amount, credit_used,
+                order_items ( id, quantity, is_large,
+                  dishes ( price_regular, price_vip, large_price_regular, large_price_vip, has_large )
+                )
+              `)
+              .eq('parent_id', parentId)
+              .eq('status', 'paid')
+              .gte('order_date', todayStr);
+
+            if (futureOrders && futureOrders.length > 0) {
+              for (const order of futureOrders) {
+                let newGross = 0;
+                for (const item of (order.order_items || [])) {
+                  const dish = (item as any).dishes;
+                  if (!dish) continue;
+                  const isLarge = !!item.is_large && !!dish.has_large;
+                  const regPrice = isLarge
+                    ? Number(dish.large_price_regular ?? dish.price_regular)
+                    : Number(dish.price_regular);
+                  newGross += regPrice * item.quantity;
+                  await supabaseAdmin.from('order_items').update({
+                    unit_price: regPrice,
+                    total_price: regPrice * item.quantity,
+                  }).eq('id', item.id);
+                }
+                await supabaseAdmin.from('orders').update({
+                  status: 'paid',
+                  gross_amount: newGross,
+                  total_amount: newGross - Number(order.credit_used),
+                }).eq('id', order.id);
+              }
+            }
+
+            // 2. Cancel the Stripe subscription
+            if (subId) {
+              try { await stripe.subscriptions.cancel(subId); } catch (e) {
+                console.warn('Webhook: failed to cancel stripe subscription:', e);
+              }
+            }
+
+            // 3. Strip VIP from parent
+            await supabaseAdmin.from('parents').update({
+              is_vip: false,
+              stripe_subscription_id: null,
+              vip_cancel_at: null,
+              vip_cancel_at_period_end: false,
+            }).eq('id', parentId);
+          }
+          break;
+        }
+
         // 1. IS THIS A VIP SUBSCRIPTION?
         if (session.mode === 'subscription') {
           const clerkUserId = session.client_reference_id; // we will pass this during checkout creation
@@ -70,10 +131,17 @@ export async function POST(req: NextRequest) {
 
           if (!parent) break;
 
-          // Update parent to VIP and save stripe customer ID
+          // Update parent to VIP and save stripe customer ID & subscription ID
+          const subscriptionId = session.subscription as string;
           await supabaseAdmin
             .from('parents')
-            .update({ is_vip: true, stripe_customer_id: customerId })
+            .update({ 
+              is_vip: true, 
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscriptionId,
+              vip_cancel_at: null,
+              vip_cancel_at_period_end: false
+            })
             .eq('id', parent.id);
 
           // Calculate Proration
@@ -96,7 +164,32 @@ export async function POST(req: NextRequest) {
           }
 
           await sendVipActivationEmail(parent.email, parent.name, prorationCredit);
-        } 
+
+          // Referral credit: give referrer $5 when a referred user joins VIP
+          if (parent.referred_by) {
+            await supabaseAdmin.from('credits').insert({
+              parent_id: parent.referred_by,
+              amount: 5.00,
+              source: 'referral',
+            });
+
+            const { data: referrer } = await supabaseAdmin
+              .from('parents')
+              .select('name, email')
+              .eq('id', parent.referred_by)
+              .single();
+
+            if (referrer?.email) {
+              await sendReferralRewardEmail(referrer.email, referrer.name, parent.name);
+            }
+
+            // Clear referred_by so they can only trigger a referral credit once
+            await supabaseAdmin
+              .from('parents')
+              .update({ referred_by: null })
+              .eq('id', parent.id);
+          }
+        }
         
         // 2. IS THIS A NORMAL ORDER?
         else if (session.mode === 'payment') {
@@ -144,36 +237,6 @@ export async function POST(req: NextRequest) {
               .single();
 
             if (parent) {
-              // Fire referral logic if applicable
-              if (parent.referred_by) {
-                // Check if this is their very first paid order
-                const { count } = await supabaseAdmin
-                  .from('orders')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('parent_id', parent.id)
-                  .eq('status', 'paid');
-                
-                // If it's 1, it means the update above just made it their first paid order!
-                if (count === 1) {
-                  await supabaseAdmin.from('credits').insert({
-                    parent_id: parent.referred_by,
-                    amount: 5.00,
-                    source: 'referral'
-                  });
-                  
-                  // Fetch referrer details to send them the good news
-                  const { data: referrer } = await supabaseAdmin
-                    .from('parents')
-                    .select('name, email')
-                    .eq('id', parent.referred_by)
-                    .single();
-                    
-                  if (referrer && referrer.email) {
-                    await sendReferralRewardEmail(referrer.email, referrer.name, parent.name);
-                  }
-                }
-              }
-
               await sendOrderConfirmationEmail(parent.email, parent.name, totalCharged);
             }
           }
@@ -194,7 +257,12 @@ export async function POST(req: NextRequest) {
         if (parent) {
           await supabaseAdmin
             .from('parents')
-            .update({ is_vip: false })
+            .update({ 
+              is_vip: false,
+              stripe_subscription_id: null,
+              vip_cancel_at: null,
+              vip_cancel_at_period_end: false
+            })
             .eq('id', parent.id);
 
           await sendVipCancellationEmail(parent.email, parent.name);

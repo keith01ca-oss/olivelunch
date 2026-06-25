@@ -34,13 +34,13 @@ interface Props {
 // Format: { 'YYYY-MM-DD': { dishId: number } }
 type Cart = Record<string, Record<string, number>>;
 
-// Compute available months (Current month + next 11 months)
+// Compute available months: current month + next 11 months (12 total, rolling)
 function getAvailableMonths() {
   const months: Date[] = [];
-  let current = startOfMonth(new Date());
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
   for (let i = 0; i < 12; i++) {
-    months.push(current);
-    current = addMonths(current, 1);
+    months.push(addMonths(start, i));
   }
   return months;
 }
@@ -500,8 +500,17 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       const data = await res.json();
 
       if (data.error) { alert(data.error); return; }
-      if (data.stripe_url) window.location.href = data.stripe_url;
-      else if (data.success) router.push('/dashboard?success=true');
+      if (data.stripe_url) {
+        // Clear cart from localStorage BEFORE leaving (so it's gone when we return)
+        try { localStorage.removeItem(`olive_cart_${selectedChildId}`); } catch (e) {}
+        setCart({});
+        window.location.href = data.stripe_url;
+      } else if (data.success) {
+        // Zero-cost order (paid via credit) — clear cart and go to dashboard
+        try { localStorage.removeItem(`olive_cart_${selectedChildId}`); } catch (e) {}
+        setCart({});
+        router.push('/dashboard?success=true');
+      }
     } catch (err) {
       alert("Something went wrong. Please try again.");
     } finally {
@@ -1043,6 +1052,24 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                                       onClick={() => updateQty(dateKey, dishId, -1)}
                                       className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 text-xs leading-none shrink-0 transition-opacity"
                                     >×</button>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Already ordered items */}
+                              {existingOrder && existingOrder.order_items?.map((item: any) => {
+                                const dish = item.dishes;
+                                if (!dish) return null;
+                                return (
+                                  <div key={item.id} className="flex items-start gap-1">
+                                    <span className={`text-[10px] leading-tight flex-1 font-medium rounded px-1 py-0.5 opacity-80 ${
+                                      dish.category === 'main' ? 'bg-green-100 text-green-800' :
+                                      dish.category === 'side' ? 'bg-amber-50 text-amber-700' :
+                                      dish.category === 'drink' ? 'bg-blue-50 text-blue-700' :
+                                      'bg-purple-50 text-purple-700'
+                                    }`}>
+                                      {item.quantity > 1 && <span className="font-bold">{item.quantity}×</span>} {dish.name}
+                                    </span>
                                   </div>
                                 );
                               })}

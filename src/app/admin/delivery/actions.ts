@@ -107,3 +107,18 @@ export async function updateSchoolRoute(schoolId: string, newRouteId: string, st
   revalidatePath('/admin/delivery');
   return { success: true };
 }
+
+export async function updateSchoolActive(id: string, isActive: boolean) {
+  const { error } = await supabaseAdmin
+    .from('schools')
+    .update({ is_active: isActive })
+    .eq('id', id);
+    
+  if (error) {
+    console.error('Error updating school status:', error);
+    return { error: 'Failed to update school status' };
+  }
+  
+  revalidatePath('/admin/delivery');
+  return { success: true };
+}

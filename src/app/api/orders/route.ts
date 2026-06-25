@@ -90,6 +90,13 @@ export async function POST(req: NextRequest) {
     const currentHour = now.getHours();
     const todayStr = now.toISOString().split('T')[0];
 
+    // Max advance window: 60 days. Prevents VIP members from locking in
+    // VIP prices far into the future and then cancelling their subscription.
+    const MAX_ADVANCE_DAYS = 60;
+    const maxOrderDate = new Date(now);
+    maxOrderDate.setDate(maxOrderDate.getDate() + MAX_ADVANCE_DAYS);
+    const maxOrderDateStr = maxOrderDate.toISOString().split('T')[0];
+
     for (const order of orders) {
       // Validate date cutoff
       const orderDate = new Date(order.order_date);
@@ -271,13 +278,13 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${req.headers.get('origin')}/dashboard?success=true`,
+      success_url: `${req.headers.get('origin')}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get('origin')}/dashboard?canceled=true`,
       metadata: {
         parentId,
         creditToUse: creditToUse.toString(),
-        couponId: couponId || '',
-        isBulkOrder: 'true'
+        isBulkOrder: 'true',
+        ...(couponId ? { couponId } : {})
       }
     });
 

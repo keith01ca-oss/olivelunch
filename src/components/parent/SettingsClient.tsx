@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { UserProfile } from '@clerk/nextjs';
-import { User, Users, CreditCard, MessageSquare, Phone, ChevronRight, ArrowLeft, Plus, Edit2, Check, X, Send, Settings } from 'lucide-react';
+import { User, Users, CreditCard, MessageSquare, Phone, ChevronRight, ArrowLeft, Plus, Edit2, Check, X, Send, Settings, Star } from 'lucide-react';
 import { submitSuggestion, updateChild, addChild } from '@/app/(parent)/settings/actions';
+import { getVipCancellationSummary, processVipCancellation } from '@/app/(parent)/vip/actions';
 import { toast } from 'sonner';
 
-type Tab = 'account' | 'children' | 'credits' | 'suggestions' | 'contact';
+type Tab = 'account' | 'children' | 'vip' | 'credits' | 'suggestions' | 'contact';
 
 interface Props {
   parent: any;
@@ -33,9 +34,45 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
   const [suggestion, setSuggestion] = useState('');
   const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
 
-  const tabs: { id: Tab; label: string; icon: any; desc: string }[] = [
+  // --- VIP Cancel State ---
+  const [cancelSummary, setCancelSummary] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [processingCancel, setProcessingCancel] = useState(false);
+
+  const handleOpenCancelModal = async () => {
+    setLoadingSummary(true);
+    const res = await getVipCancellationSummary(parent.id);
+    setLoadingSummary(false);
+    if ('error' in res) {
+      toast.error(res.error || 'Failed to fetch cancellation summary');
+    } else {
+      setCancelSummary(res);
+      setShowCancelModal(true);
+    }
+  };
+
+  const handleProcessCancel = async (option: 'pay_difference' | 'cancel_meals') => {
+    setProcessingCancel(true);
+    const res = await processVipCancellation(parent.id, option, cancelSummary?.subscriptionId || null);
+    setProcessingCancel(false);
+    if (res.error) {
+      toast.error(res.error);
+    } else if (res.checkoutUrl) {
+      toast.success(res.message || 'Redirecting to payment...');
+      window.location.href = res.checkoutUrl;
+    } else {
+      toast.success(res.message || 'VIP cancelled successfully!');
+      setShowCancelModal(false);
+      // Reload page to refresh VIP status and orders
+      window.location.reload();
+    }
+  };
+
+  const tabs: { id: Tab | 'vip'; label: string; icon: any; desc: string }[] = [
     { id: 'account', label: 'Account Profile', icon: User, desc: 'Manage your email, password, and security.' },
     { id: 'children', label: 'My Children', icon: Users, desc: 'Manage children, schools, and divisions.' },
+    { id: 'vip', label: 'VIP Status', icon: Settings, desc: 'View, manage, or cancel your Olive Lunch VIP membership.' },
     { id: 'credits', label: 'Store Credit', icon: CreditCard, desc: 'View your balance and transaction history.' },
     { id: 'suggestions', label: 'Suggestions', icon: MessageSquare, desc: 'Send feedback directly to the kitchen.' },
     { id: 'contact', label: 'Contact Us', icon: Phone, desc: 'Get in touch via phone or email.' },
@@ -122,7 +159,7 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
             <input name="name" required placeholder="Child's Full Name" className="rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none" />
             <select name="schoolId" required className="rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none">
               <option value="">Select School...</option>
-              {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {schools.filter(s => s.is_active !== false).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             <input name="division" required placeholder="Division (e.g. Div 5)" className="rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none" />
             <input name="deliveryLocation" required placeholder="Delivery Location (e.g. Office)" className="rounded-xl border px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none" />
@@ -153,7 +190,13 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
                       <div>
                         <label className="text-[10px] font-bold text-muted-foreground uppercase">School</label>
                         <select value={editData.school_id} onChange={e => setEditData({...editData, school_id: e.target.value})} className="w-full mt-1 rounded-lg border px-3 py-1.5 text-sm outline-none focus:border-primary">
-                          {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          {schools
+                            .filter(s => s.is_active !== false || s.id === editData.school_id)
+                            .map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}{s.is_active === false ? ' (Inactive)' : ''}
+                              </option>
+                            ))}
                         </select>
                       </div>
                       <div>
@@ -228,7 +271,7 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
                 <tbody className="divide-y">
                   {credits.map(c => (
                     <tr key={c.id}>
-                      <td className="px-4 py-3">{new Date(c.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-3">{new Date(c.created_at).toLocaleString()}</td>
                       <td className="px-4 py-3 capitalize font-medium">{c.source}</td>
                       <td className="px-4 py-3 text-right font-bold text-green-600">+${Number(c.amount).toFixed(2)}</td>
                     </tr>
@@ -334,6 +377,207 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
     </div>
   );
 
+  const renderVip = () => {
+    const isVip = parent?.is_vip || false;
+    const isCancelled = parent?.vip_cancel_at_period_end || false;
+    const cancelDate = parent?.vip_cancel_at ? new Date(parent.vip_cancel_at).toLocaleDateString() : '';
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-amber-500/15 to-amber-500/5 border border-amber-500/30 rounded-3xl p-6 md:p-8 relative overflow-hidden">
+          <div className="absolute -right-8 -top-8 opacity-10">
+            <Star className="w-40 h-40 text-amber-500 fill-amber-500" />
+          </div>
+          
+          <div className="relative space-y-4">
+            <div className="inline-flex items-center gap-2 bg-amber-500/20 px-4 py-1.5 rounded-full text-xs font-black text-amber-700 uppercase tracking-widest">
+              ⭐ VIP Membership Status
+            </div>
+
+            {isVip ? (
+              isCancelled ? (
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900">VIP Membership Ending Soon</h3>
+                  <p className="text-slate-700 mt-2 font-semibold">
+                    Your VIP privileges remain fully active until <strong className="text-amber-600 font-bold">{cancelDate}</strong>.
+                  </p>
+                  <p className="text-sm text-slate-500 mt-2 font-medium">
+                    You have cancelled your auto-renewing subscription. After this date, you will return to regular pricing.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="text-3xl font-black text-slate-900">You are an active VIP Member!</h3>
+                  <p className="text-slate-700 mt-2 font-semibold">
+                    Enjoying discount pricing on every single order, priority support, and sick day protection.
+                  </p>
+                  <div className="mt-6 pt-4 border-t border-amber-500/20 flex flex-wrap gap-4 items-center justify-between">
+                    <p className="text-xs font-bold text-slate-500">Subscription manages automatically via Stripe.</p>
+                    <button
+                      onClick={handleOpenCancelModal}
+                      disabled={loadingSummary}
+                      className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-black text-white hover:bg-slate-800 transition-all shadow-md disabled:opacity-50"
+                    >
+                      {loadingSummary ? 'Checking Summary...' : 'Cancel VIP Membership'}
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div>
+                <h3 className="text-2xl font-black text-slate-900">You are currently on the Regular Plan</h3>
+                <p className="text-slate-700 mt-2 font-semibold">
+                  Upgrade to VIP to unlock up to 50% discount savings on all lunches, priority support, and sick day protection.
+                </p>
+                <div className="mt-6">
+                  <a
+                    href="/vip"
+                    className="inline-flex items-center gap-2 rounded-xl bg-amber-500 text-slate-900 font-black px-6 py-3 shadow-md hover:bg-amber-400 transition-all transform hover:scale-105"
+                  >
+                    View VIP Plans & Upgrade
+                    <Star className="w-4 h-4 fill-slate-900" />
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* VIP Benefits summary card */}
+        <div className="bg-card border rounded-2xl p-5 md:p-6 space-y-4">
+          <h4 className="font-bold text-lg text-slate-900">Included with VIP Membership:</h4>
+          <ul className="grid sm:grid-cols-2 gap-4 text-sm text-slate-700 font-medium">
+            <li className="flex items-center gap-2.5">
+              <span className="text-amber-500">✓</span> Save up to 50% on every single meal
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="text-amber-500">✓</span> Discounted sides and beverages
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="text-amber-500">✓</span> Sick day protection (100% full credit refund)
+            </li>
+            <li className="flex items-center gap-2.5">
+              <span className="text-amber-500">✓</span> Priority customer service
+            </li>
+          </ul>
+        </div>
+
+        {/* Cancellation Modal */}
+        {showCancelModal && cancelSummary && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <div className="bg-card border-2 border-slate-200 shadow-2xl rounded-3xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in fade-in zoom-in-95 duration-200">
+              
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-500/10 p-3 rounded-2xl text-amber-600">
+                    <Star className="w-6 h-6 fill-amber-500" />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-xl text-slate-900">Cancel VIP Membership</h2>
+                    <p className="text-xs font-bold text-slate-500 mt-0.5">
+                      Choose how you would like to handle your future scheduled lunches
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="p-2 hover:bg-muted rounded-xl text-muted-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                
+                {/* Future orders warning box */}
+                <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-5">
+                  <h4 className="font-black text-amber-800 text-base mb-1">⚠️ You have future VIP-discounted meals:</h4>
+                  <p className="text-sm text-amber-700 font-medium">
+                    You currently have <strong className="font-bold">{cancelSummary.totalFutureVipMeals} meals</strong> scheduled and paid for at VIP discounted prices.
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  
+                  {/* Option A: Revert & Pay Difference */}
+                  <div className="border-2 border-slate-200 hover:border-primary/50 bg-card rounded-2xl p-5 flex flex-col justify-between transition-all">
+                    <div>
+                      <span className="bg-primary/10 text-primary text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        Option A
+                      </span>
+                      <h4 className="font-black text-lg text-slate-900 mt-3">Keep lunches, pay difference</h4>
+                      <p className="text-xs text-slate-600 font-semibold leading-relaxed mt-2">
+                        Keep all your scheduled lunches. Since you are leaving VIP, the future meals will be recalculated at regular pricing.
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t">
+                      <div className="flex items-end justify-between mb-4">
+                        <span className="text-xs font-bold text-slate-500">Pay Difference:</span>
+                        <span className="text-2xl font-black text-slate-950">${cancelSummary.priceDifference.toFixed(2)}</span>
+                      </div>
+                      <button
+                        onClick={() => handleProcessCancel('pay_difference')}
+                        disabled={processingCancel}
+                        className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl hover:bg-primary/90 transition-all text-sm disabled:opacity-50"
+                      >
+                        {processingCancel ? 'Processing...' : 'Keep Lunes & Pay Diff'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Option B: Cancel Future Meals */}
+                  <div className="border-2 border-slate-200 hover:border-amber-500/50 bg-card rounded-2xl p-5 flex flex-col justify-between transition-all">
+                    <div>
+                      <span className="bg-amber-500/10 text-amber-700 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        Option B
+                      </span>
+                      <h4 className="font-black text-lg text-slate-900 mt-3">Cancel future meals</h4>
+                      <p className="text-xs text-slate-600 font-semibold leading-relaxed mt-2">
+                        Keep your VIP status and scheduled lunches until your subscription month ends on <strong className="font-bold">{new Date(cancelSummary.subscriptionEnd).toLocaleDateString()}</strong>.
+                        Any meals scheduled after that date will be automatically cancelled and 100% refunded to your store credit.
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t">
+                      <div className="flex items-end justify-between mb-4">
+                        <span className="text-xs font-bold text-slate-500">Store Credit Refund:</span>
+                        <span className="text-2xl font-black text-green-600">+${cancelSummary.refundValueAfterPeriodEnd.toFixed(2)}</span>
+                      </div>
+                      <button
+                        onClick={() => handleProcessCancel('cancel_meals')}
+                        disabled={processingCancel}
+                        className="w-full bg-amber-500 text-slate-900 font-black py-3 rounded-xl hover:bg-amber-400 transition-all text-sm disabled:opacity-50"
+                      >
+                        {processingCancel ? 'Processing...' : 'Cancel Future Meals'}
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t bg-slate-50/50 flex justify-end">
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-muted transition-colors"
+                  disabled={processingCancel}
+                >
+                  Go Back / Keep VIP
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+
   const activeTabData = tabs.find(t => t.id === activeTab);
 
   return (
@@ -397,6 +641,7 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
             
             {activeTab === 'account' && renderAccount()}
             {activeTab === 'children' && renderChildren()}
+            {activeTab === 'vip' && renderVip()}
             {activeTab === 'credits' && renderCredits()}
             {activeTab === 'suggestions' && renderSuggestions()}
             {activeTab === 'contact' && renderContact()}

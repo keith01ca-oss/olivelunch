@@ -17,6 +17,8 @@ export default async function DashboardPage({
   }
 
   const { parentId } = authContext;
+  const { getOrResolveOrgId } = await import('@/lib/auth');
+  const orgId = await getOrResolveOrgId();
 
   // Fetch Parent Data
   const { data: parent } = await supabaseAdmin
@@ -25,9 +27,81 @@ export default async function DashboardPage({
     .eq('id', parentId)
     .single();
 
-  // Optimistic VIP state from Stripe redirect
-  const isVipSuccess = searchParams?.vip_success === 'true';
-  const isVip = parent?.is_vip || isVipSuccess;
+  // Optimistic VIP state from Stripe redirect & Verification
+  let isVip = parent?.is_vip || false;
+  
+  if (searchParams?.vip_success === 'true' && searchParams?.session_id && !parent?.is_vip) {
+    const sessionId = searchParams.session_id as string;
+    try {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' as any });
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid' && session.mode === 'subscription') {
+        const subscriptionId = session.subscription as string;
+        const customerId = session.customer as string;
+        
+        // Update database directly just in case webhook didn't arrive yet
+        await supabaseAdmin
+          .from('parents')
+          .update({ 
+            is_vip: true, 
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            vip_cancel_at: null,
+            vip_cancel_at_period_end: false
+          })
+          .eq('id', parentId);
+          
+        isVip = true;
+      }
+    } catch (e) {
+      console.error('Failed to sync VIP status from session', e);
+    }
+  }
+
+  // Sync normal meal orders if webhook is delayed
+  if (searchParams?.success === 'true' && searchParams?.session_id) {
+    const sessionId = searchParams.session_id as string;
+    try {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' as any });
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid' && session.mode === 'payment') {
+        const { data: orders } = await supabaseAdmin
+          .from('orders')
+          .update({ status: 'paid' })
+          .eq('stripe_session_id', session.id)
+          .eq('status', 'pending')
+          .select('id, parent_id, total_amount');
+          
+        if (orders && orders.length > 0) {
+          const creditToUse = Number(session.metadata?.creditToUse || '0');
+          const couponId = session.metadata?.couponId;
+
+          if (creditToUse > 0) {
+            // Check if credit was already deducted (by webhook) to avoid double counting
+            const { data: existingCredit } = await supabaseAdmin.from('credits').select('id').eq('order_id', orders[0].id);
+            if (!existingCredit || existingCredit.length === 0) {
+              await supabaseAdmin.from('credits').insert({
+                parent_id: parentId,
+                amount: -creditToUse,
+                source: 'order_usage',
+                order_id: orders[0].id
+              });
+            }
+          }
+          if (couponId) {
+            // Increment coupon usage. We use RPC if possible or ignore as webhook will catch it
+            await supabaseAdmin.rpc('increment_coupon_usage', { p_coupon_id: couponId }).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to sync order status from session', e);
+    }
+  }
 
   // Fetch Children
   const { data: children } = await supabaseAdmin
@@ -44,8 +118,30 @@ export default async function DashboardPage({
 
   const totalCredit = credits ? credits.reduce((sum, c) => sum + Number(c.amount), 0) : 0;
 
+  // Fetch Dashboard Messages
+  const { data: dashboardMessages } = await supabaseAdmin
+    .from('dashboard_messages')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
   return (
     <div className="space-y-6">
+      {searchParams?.success === 'true' && (
+        <div className="p-5 rounded-2xl border-2 bg-emerald-50 border-emerald-200 text-emerald-950 shadow-md animate-in fade-in slide-in-from-top-4 duration-300 flex items-start gap-4">
+          <div className="text-3xl">🥳</div>
+          <div className="flex-1">
+            <h4 className="font-extrabold text-lg text-emerald-900">Order Placed Successfully!</h4>
+            <p className="text-sm font-semibold mt-1">
+              {searchParams?.session_id 
+                ? 'Your payment was processed and your lunch order is now active.'
+                : 'Your order was paid 100% using your available account credit.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Welcome back, {parent?.name}</h1>
@@ -66,6 +162,34 @@ export default async function DashboardPage({
           </div>
         )}
       </header>
+
+      {/* Dashboard Messages System Alert Box */}
+      {dashboardMessages && dashboardMessages.length > 0 && (
+        <div className="space-y-3">
+          {dashboardMessages.map((msg) => {
+            const bgClass = msg.type === 'warning' 
+              ? 'bg-amber-50 border-amber-200 text-amber-900' 
+              : msg.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-blue-50 border-blue-200 text-blue-900';
+            
+            const accentText = msg.type === 'warning'
+              ? 'text-amber-800'
+              : msg.type === 'success'
+              ? 'text-emerald-800'
+              : 'text-blue-800';
+
+            return (
+              <div key={msg.id} className={`p-5 rounded-2xl border-2 ${bgClass} shadow-sm animate-in fade-in slide-in-from-top-4 duration-300 flex items-start gap-3`}>
+                <div className="text-lg">📢</div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold leading-relaxed">{msg.message}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Stats/Overview Row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

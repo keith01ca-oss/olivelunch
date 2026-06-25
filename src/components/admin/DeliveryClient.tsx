@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Truck, MapPin, Plus, Trash2, Link as LinkIcon, School } from 'lucide-react';
-import { createRoute, deleteRoute, createSchool, deleteSchool, updateSchoolRoute } from '@/app/admin/delivery/actions';
+import { Truck, MapPin, Plus, Trash2, Link as LinkIcon, School, ToggleLeft, ToggleRight } from 'lucide-react';
+import { createRoute, deleteRoute, createSchool, deleteSchool, updateSchoolRoute, updateSchoolActive } from '@/app/admin/delivery/actions';
 
 interface Route {
   id: string;
@@ -12,6 +12,7 @@ interface Route {
 interface SchoolItem {
   id: string;
   name: string;
+  isActive: boolean;
   assignedRouteId: string | null;
   stopOrder: number;
 }
@@ -53,7 +54,13 @@ export default function DeliveryClient({ initialRoutes, initialSchools, orgId }:
     const res = await createSchool(orgId, newSchoolName, newSchoolRoute || undefined, newSchoolStop);
     if (res.error) return alert(res.error);
     if (res.data) {
-      setSchools([...schools, { id: res.data.id, name: res.data.name, assignedRouteId: newSchoolRoute || null, stopOrder: newSchoolStop }]);
+      setSchools([...schools, { 
+        id: res.data.id, 
+        name: res.data.name, 
+        isActive: res.data.is_active !== false,
+        assignedRouteId: newSchoolRoute || null, 
+        stopOrder: newSchoolStop 
+      }]);
       setNewSchoolName('');
       setNewSchoolRoute('');
       setNewSchoolStop(0);
@@ -65,6 +72,13 @@ export default function DeliveryClient({ initialRoutes, initialSchools, orgId }:
     const res = await deleteSchool(id);
     if (res.error) return alert(res.error);
     setSchools(schools.filter(s => s.id !== id));
+  };
+
+  const handleToggleSchoolActive = async (schoolId: string, currentActive: boolean) => {
+    const nextActive = !currentActive;
+    const res = await updateSchoolActive(schoolId, nextActive);
+    if (res.error) return alert(res.error);
+    setSchools(schools.map(s => s.id === schoolId ? { ...s, isActive: nextActive } : s));
   };
 
   const handleUpdateSchoolRoute = async (schoolId: string, routeId: string, stopOrder: number) => {
@@ -195,16 +209,36 @@ export default function DeliveryClient({ initialRoutes, initialSchools, orgId }:
               {schools.length === 0 ? (
                 <p className="text-center text-muted-foreground text-sm py-8">No schools created yet.</p>
               ) : schools.map(school => (
-                <div key={school.id} className="flex flex-col p-3 rounded-xl border bg-background hover:border-primary/40 transition-colors gap-3">
+                <div key={school.id} className={`flex flex-col p-3 rounded-xl border bg-background hover:border-primary/40 transition-colors gap-3 ${!school.isActive ? 'opacity-60 bg-muted/20' : ''}`}>
                   <div className="flex items-center justify-between">
-                    <p className="font-bold text-sm">{school.name}</p>
-                    <button
-                      onClick={() => handleDeleteSchool(school.id)}
-                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                      title="Delete School"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <p className={`font-bold text-sm ${!school.isActive ? 'text-muted-foreground' : ''}`}>{school.name}</p>
+                      {!school.isActive && (
+                        <span className="text-[10px] font-extrabold bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleToggleSchoolActive(school.id, school.isActive)}
+                        className="p-1.5 rounded-md border hover:bg-muted transition-colors"
+                        title={school.isActive ? 'Deactivate School' : 'Activate School'}
+                      >
+                        {school.isActive ? (
+                          <ToggleRight className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSchool(school.id)}
+                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                        title="Delete School"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="flex items-center gap-2">

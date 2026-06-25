@@ -8,7 +8,7 @@ import { Home, Calendar, ShoppingBag, Settings, ShieldCheck } from 'lucide-react
 const navItems = [
   { name: 'Home', href: '/dashboard', icon: Home },
   { name: 'Menu', href: '/menu', icon: Calendar },
-  { name: 'Orders', href: '/orders', icon: ShoppingBag },
+  { name: 'My Orders', href: '/orders', icon: ShoppingBag },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

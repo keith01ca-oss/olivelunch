@@ -50,6 +50,9 @@ export interface Database {
           clerk_user_id: string
           org_id: string
           stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          vip_cancel_at: string | null
+          vip_cancel_at_period_end: boolean
           email: string
           name: string
           phone: string | null
@@ -64,6 +67,9 @@ export interface Database {
           clerk_user_id: string
           org_id: string
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          vip_cancel_at?: string | null
+          vip_cancel_at_period_end?: boolean
           email: string
           name: string
           phone?: string | null
@@ -78,6 +84,9 @@ export interface Database {
           clerk_user_id?: string
           org_id?: string
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          vip_cancel_at?: string | null
+          vip_cancel_at_period_end?: boolean
           email?: string
           name?: string
           phone?: string | null
@@ -93,16 +102,19 @@ export interface Database {
           id: string
           org_id: string
           name: string
+          is_active: boolean
         }
         Insert: {
           id?: string
           org_id: string
           name: string
+          is_active?: boolean
         }
         Update: {
           id?: string
           org_id?: string
           name?: string
+          is_active?: boolean
         }
       }
       routes: {
@@ -504,6 +516,32 @@ export interface Database {
           instructions?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      dashboard_messages: {
+        Row: {
+          id: string
+          org_id: string
+          message: string
+          type: 'info' | 'warning' | 'success'
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          message: string
+          type?: 'info' | 'warning' | 'success'
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          message?: string
+          type?: 'info' | 'warning' | 'success'
+          is_active?: boolean
+          created_at?: string
         }
       }
     }

@@ -50,7 +50,7 @@ export async function sendReferralRewardEmail(email: string, name: string, refer
       from: 'Olive Lunch <hello@olivelunch.com>',
       to: email,
       subject: 'You earned a $5 store credit! 🥳',
-      html: `<p>Hi ${name},</p><p>Great news! <strong>${referredName}</strong> just placed their first order using your referral link.</p><p>We have added a <strong>$5.00 store credit</strong> to your account, which will be automatically applied to your next checkout.</p><p>Thank you for spreading the word about Olive Lunch!</p>`
+      html: `<p>Hi ${name},</p><p>Great news! <strong>${referredName}</strong> just joined VIP using your referral link.</p><p>We have added a <strong>$5.00 store credit</strong> to your account, which will be automatically applied to your next checkout.</p><p>Thank you for spreading the word about Olive Lunch!</p>`
     });
     if (res.error) throw new Error(res.error.message);
   } catch (error) {

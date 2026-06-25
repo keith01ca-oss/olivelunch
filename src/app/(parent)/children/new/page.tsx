@@ -12,7 +12,7 @@ export default async function NewChildPage() {
   // Fetch available schools for this org
   const schoolQuery = supabaseAdmin
     .from('schools')
-    .select('id, name')
+    .select('id, name, is_active')
     .order('name')
     .eq('org_id', orgId);
   const { data: schools } = await schoolQuery;
@@ -54,7 +54,7 @@ export default async function NewChildPage() {
               defaultValue=""
             >
               <option value="" disabled>Select a school...</option>
-              {schools?.map((school) => (
+              {schools?.filter(s => s.is_active !== false).map((school) => (
                 <option key={school.id} value={school.id}>
                   {school.name}
                 </option>

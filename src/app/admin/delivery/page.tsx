@@ -36,6 +36,7 @@ export default async function AdminDeliveryPage() {
     return {
       id: school.id,
       name: school.name,
+      isActive: school.is_active !== false,
       assignedRouteId: mapping ? mapping.route_id : null,
       stopOrder: mapping ? mapping.stop_order : 0
     };

@@ -34,7 +34,7 @@ export default function ReferralCard({ code }: { code: string | null }) {
       <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">Referral Code</h3>
       <p className="mt-2 text-3xl font-black font-mono tracking-widest text-primary">{code}</p>
       <p className="text-sm font-semibold text-slate-800 mt-1 mb-4">
-        Share your link — earn <span className="font-black text-primary underline decoration-2">$5 credit</span> for each new customer's first order
+        Refer a friend, and get <span className="font-black text-primary underline decoration-2">$5 credit</span> for every new VIP signup.
       </p>
       <button
         onClick={handleCopy}

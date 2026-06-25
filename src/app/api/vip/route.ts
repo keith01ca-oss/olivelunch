@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard?vip_success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/vip?canceled=true`,
+      success_url: `${new URL(req.url).origin}/dashboard?vip_success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${new URL(req.url).origin}/vip?canceled=true`,
       client_reference_id: parentId,
       metadata: {
         is_vip_subscription: 'true',
