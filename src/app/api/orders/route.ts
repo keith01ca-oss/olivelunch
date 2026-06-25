@@ -41,14 +41,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No orders provided' }, { status: 400 });
     }
 
-    // 1. Fetch parent VIP status & existing credit balance
+    // 1. Delete any pending orders that match the incoming child/date first,
+    // so they do not lock credits we want to reuse in this new checkout.
+    for (const order of orders) {
+      const { data: existingOrders } = await supabaseAdmin
+        .from('orders')
+        .select('id, status')
+        .eq('child_id', order.child_id)
+        .eq('order_date', order.order_date)
+        .neq('status', 'cancelled');
+        
+      if (existingOrders && existingOrders.length > 0) {
+        const pendingIds = existingOrders.filter(o => o.status === 'pending').map(o => o.id);
+        if (pendingIds.length > 0) {
+           await supabaseAdmin.from('orders').delete().in('id', pendingIds);
+        }
+      }
+    }
+
+    // 2. Fetch parent VIP status & existing credit balance
     const { data: parent } = await supabaseAdmin.from('parents').select('is_vip').eq('id', parentId).single();
     const isVip = parent?.is_vip || false;
 
     const { data: creditRows } = await supabaseAdmin.from('credits').select('amount').eq('parent_id', parentId);
-    let creditBalance = creditRows ? creditRows.reduce((sum, row) => sum + Number(row.amount), 0) : 0;
+    const totalCredit = creditRows ? creditRows.reduce((sum, row) => sum + Number(row.amount), 0) : 0;
 
-    // 2. Validate Coupon
+    // Deduct credit used by other pending orders
+    const { data: otherPending } = await supabaseAdmin
+      .from('orders')
+      .select('credit_used')
+      .eq('parent_id', parentId)
+      .eq('status', 'pending');
+    const lockedCredit = otherPending ? otherPending.reduce((sum, o) => sum + Number(o.credit_used || 0), 0) : 0;
+
+    let creditBalance = Math.max(0, totalCredit - lockedCredit);
+
+    // 3. Validate Coupon
     let couponDiscount = 0;
     let couponId: string | null = null;
     let validCoupon = null;
@@ -107,23 +135,6 @@ export async function POST(req: NextRequest) {
       
       if (todayStr > yesterdayStr || (todayStr === yesterdayStr && currentHour >= 13)) {
          return NextResponse.json({ error: `Cutoff passed for order date ${order.order_date}` }, { status: 400 });
-      }
-
-      // Check existing orders
-      const { data: existingOrders } = await supabaseAdmin
-        .from('orders')
-        .select('id, status')
-        .eq('child_id', order.child_id)
-        .eq('order_date', order.order_date)
-        .neq('status', 'cancelled');
-        
-      if (existingOrders && existingOrders.length > 0) {
-        // If it's just 'pending' (abandoned checkout), delete it so we can cleanly recreate their new cart!
-        // We only delete 'pending' orders. If they have 'paid' orders, we leave them alone and just create a new one.
-        const pendingIds = existingOrders.filter(o => o.status === 'pending').map(o => o.id);
-        if (pendingIds.length > 0) {
-           await supabaseAdmin.from('orders').delete().in('id', pendingIds);
-        }
       }
 
       let orderGross = 0;

@@ -14,13 +14,14 @@ interface Props {
   childrenList: any[];
   schools: any[];
   credits: any[];
+  lockedCredit?: number;
   orgId: string;
   contactPhone?: string;
   contactEmail?: string;
   contactWhatsapp?: string;
 }
 
-export default function SettingsClient({ parent, childrenList: initialChildren, schools, credits, orgId, contactPhone = '', contactEmail = '', contactWhatsapp = '' }: Props) {
+export default function SettingsClient({ parent, childrenList: initialChildren, schools, credits, lockedCredit = 0, orgId, contactPhone = '', contactEmail = '', contactWhatsapp = '' }: Props) {
   const [activeTab, setActiveTab] = useState<Tab | null>(null); // null means showing menu on mobile
   const [childrenList, setChildrenList] = useState(initialChildren);
 
@@ -243,7 +244,7 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
   );
 
   const renderCredits = () => {
-    const total = credits.reduce((sum, c) => sum + Number(c.amount), 0);
+    const total = Math.max(0, credits.reduce((sum, c) => sum + Number(c.amount), 0) - lockedCredit);
     return (
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-6 md:p-8 flex items-center justify-between">

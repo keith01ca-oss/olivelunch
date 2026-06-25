@@ -121,6 +121,14 @@ export default async function UserSettingsPage({
     .eq('parent_id', parentId || '')
     .order('created_at', { ascending: false });
 
+  // Fetch pending credits locked in orders
+  const { data: pendingOrders } = await supabaseAdmin
+    .from('orders')
+    .select('credit_used')
+    .eq('parent_id', parentId || '')
+    .eq('status', 'pending');
+  const lockedCredit = pendingOrders ? pendingOrders.reduce((sum, o) => sum + Number(o.credit_used || 0), 0) : 0;
+
   // Fetch Org Contact Info
   const { data: org } = await supabaseAdmin
     .from('organizations')
@@ -134,6 +142,7 @@ export default async function UserSettingsPage({
       childrenList={children || []}
       schools={schools || []}
       credits={credits || []}
+      lockedCredit={lockedCredit}
       orgId={orgId!}
       contactPhone={org?.settings?.contact_phone || ''}
       contactEmail={org?.settings?.contact_email || ''}

@@ -47,7 +47,18 @@ export async function POST(req: NextRequest) {
     .from('credits')
     .select('amount')
     .eq('parent_id', parentId || '');
-  const creditBalance = creditRows ? creditRows.reduce((sum, r) => sum + Number(r.amount), 0) : 0;
+  const totalCredit = creditRows ? creditRows.reduce((sum, r) => sum + Number(r.amount), 0) : 0;
+
+  // Deduct credits already locked by other pending orders
+  const { data: allPending } = await supabaseAdmin
+    .from('orders')
+    .select('id, credit_used')
+    .eq('parent_id', parentId || '')
+    .eq('status', 'pending');
+
+  const otherPending = (allPending || []).filter(o => !order_ids.includes(o.id));
+  const lockedCredit = otherPending.reduce((sum, o) => sum + Number(o.credit_used || 0), 0);
+  const creditBalance = Math.max(0, totalCredit - lockedCredit);
 
   // The total value of the orders being paid is the sum of their gross_amounts
   const totalGross = validOrders.reduce((sum, o) => sum + Number(o.gross_amount), 0);

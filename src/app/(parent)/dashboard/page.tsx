@@ -120,7 +120,17 @@ export default async function DashboardPage({
     .select('amount')
     .eq('parent_id', parentId);
 
-  const totalCredit = credits ? credits.reduce((sum, c) => sum + Number(c.amount), 0) : 0;
+  const rawCredit = credits ? credits.reduce((sum, c) => sum + Number(c.amount), 0) : 0;
+
+  // Fetch pending credits locked in orders
+  const { data: pendingOrders } = await supabaseAdmin
+    .from('orders')
+    .select('credit_used')
+    .eq('parent_id', parentId)
+    .eq('status', 'pending');
+  const lockedCredit = pendingOrders ? pendingOrders.reduce((sum, o) => sum + Number(o.credit_used || 0), 0) : 0;
+
+  const totalCredit = Math.max(0, rawCredit - lockedCredit);
 
   // Fetch Dashboard Messages
   const { data: dashboardMessages } = await supabaseAdmin

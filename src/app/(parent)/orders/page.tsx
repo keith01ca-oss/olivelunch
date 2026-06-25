@@ -81,7 +81,17 @@ export default async function ParentOrdersPage({
     .from('credits')
     .select('amount')
     .eq('parent_id', parentId || '');
-  const creditBalance = creditRows ? creditRows.reduce((sum, c) => sum + Number(c.amount), 0) : 0;
+  const rawCredit = creditRows ? creditRows.reduce((sum, c) => sum + Number(c.amount), 0) : 0;
+
+  // Fetch pending credits locked in orders
+  const { data: pendingOrders } = await supabaseAdmin
+    .from('orders')
+    .select('credit_used')
+    .eq('parent_id', parentId || '')
+    .eq('status', 'pending');
+  const lockedCredit = pendingOrders ? pendingOrders.reduce((sum, o) => sum + Number(o.credit_used || 0), 0) : 0;
+
+  const creditBalance = Math.max(0, rawCredit - lockedCredit);
 
   // ── Fetch all orders ─────────────────────────────────────────────────────
   const { data: orders } = await supabaseAdmin
