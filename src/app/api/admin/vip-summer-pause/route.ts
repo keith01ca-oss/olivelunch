@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
 
   let affected = 0;
   let failed = 0;
+  const errors: string[] = [];
 
   for (const parent of targets) {
     try {
@@ -56,8 +57,9 @@ export async function POST(req: NextRequest) {
         .update({ vip_paused: action === 'pause' })
         .eq('id', parent.id);
       affected++;
-    } catch (err) {
+    } catch (err: any) {
       console.error(`vip-summer-pause: failed for parent ${parent.id}`, err);
+      errors.push(`${parent.id}: ${err?.message || 'Unknown error'}`);
       failed++;
     }
   }
@@ -68,5 +70,6 @@ export async function POST(req: NextRequest) {
     affected,
     failed,
     total: targets.length,
+    errors,
   });
 }

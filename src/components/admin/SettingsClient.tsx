@@ -56,7 +56,7 @@ export default function SettingsClient({ org }: { org: any }) {
       if (data.error) throw new Error(data.error);
       const verb = action === 'pause' ? 'paused' : 'resumed';
       const msg = `✅ ${data.affected} subscription(s) ${verb}${data.failed > 0 ? `, ${data.failed} failed` : ''}.`;
-      setSummerResult(msg);
+      setSummerResult(msg + (data.errors?.length > 0 ? ` Errors: ${data.errors.join('; ')}` : ''));
       toast.success(msg);
     } catch (err: any) {
       toast.error(err.message || 'Failed');
