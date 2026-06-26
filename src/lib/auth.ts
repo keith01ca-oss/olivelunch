@@ -120,6 +120,28 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
       .single();
 
     if (insertError || !newParent) {
+      // If the insert failed due to a duplicate email (user existed with different clerk ID),
+      // find the existing parent by email and re-link their clerk_user_id
+      const isEmailConflict = insertError?.code === '23505' && insertError?.message?.includes('email');
+      if (isEmailConflict && insertPayload.email) {
+        const { data: existingByEmail, error: lookupError } = await supabaseAdmin
+          .from('parents')
+          .select('id')
+          .eq('email', insertPayload.email)
+          .single();
+
+        if (!lookupError && existingByEmail) {
+          // Re-link this Clerk user ID to the existing parent row
+          await supabaseAdmin
+            .from('parents')
+            .update({ clerk_user_id: clerkUserId })
+            .eq('id', existingByEmail.id);
+
+          console.log(`Re-linked clerk_user_id for parent ${existingByEmail.id} (email: ${insertPayload.email})`);
+          return { clerkUserId, role, parentId: existingByEmail.id };
+        }
+      }
+
       console.error('Failed to provision parent:', JSON.stringify(insertError), 'Payload:', JSON.stringify(insertPayload));
       return { error: `Failed to create parent profile: ${insertError?.message || 'unknown error'}`, status: 500 };
     }
