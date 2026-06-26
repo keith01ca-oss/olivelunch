@@ -79,7 +79,8 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
     const referralCode = `${namePart}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     // Check if this new user was referred by someone (cookie set by /refer/[code])
-    const refCode = cookies().get('olive_ref')?.value?.toUpperCase();
+    const cookieStore = await cookies();
+    const refCode = cookieStore.get('olive_ref')?.value?.toUpperCase();
     let referredById: string | null = null;
     if (refCode) {
       const { data: referrer } = await supabaseAdmin
@@ -119,8 +120,8 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
       .single();
 
     if (insertError || !newParent) {
-      console.error('Failed to provision parent:', insertError);
-      return { error: 'Failed to create parent profile', status: 500 };
+      console.error('Failed to provision parent:', JSON.stringify(insertError), 'Payload:', JSON.stringify(insertPayload));
+      return { error: `Failed to create parent profile: ${insertError?.message || 'unknown error'}`, status: 500 };
     }
 
     return { clerkUserId, role, parentId: newParent.id };

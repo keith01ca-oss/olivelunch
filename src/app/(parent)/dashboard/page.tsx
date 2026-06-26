@@ -13,7 +13,22 @@ export default async function DashboardPage({
   const authContext = await getResolvedParent();
   
   if ('error' in authContext) {
-    redirect('/sign-in');
+    // Only redirect to sign-in for auth errors (401), NOT for server errors (500)
+    // A 500 redirect would cause an infinite loop: dashboard→sign-in→dashboard→...
+    if (authContext.status === 401) {
+      redirect('/sign-in');
+    }
+    // For 500 errors (e.g. failed to provision parent account), show error page
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center p-8 bg-white rounded-xl shadow-sm border max-w-md">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Something went wrong</h2>
+          <p className="text-gray-500 mb-4">We couldn&apos;t load your profile. Please try refreshing the page.</p>
+          <p className="text-xs text-red-400 font-mono">{authContext.error}</p>
+          <a href="/dashboard" className="mt-4 inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Retry</a>
+        </div>
+      </div>
+    );
   }
 
   const { parentId } = authContext;
