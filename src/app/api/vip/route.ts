@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedParent } from '@/lib/auth';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-04-10' as any,
-});
-
 export async function POST(req: NextRequest) {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    console.error('STRIPE_SECRET_KEY is not configured');
+    return NextResponse.json({ error: 'Stripe is not configured on the server.' }, { status: 500 });
+  }
+
+  const stripe = new Stripe(stripeSecretKey, {
+    apiVersion: '2024-04-10' as any,
+  });
+
   const authContext = await getResolvedParent();
   
   if ('error' in authContext) {
