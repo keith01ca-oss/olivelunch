@@ -7,6 +7,7 @@ import {
   CheckCircle, Clock, XCircle, RefreshCcw, ShoppingBag,
   ChevronDown, ChevronUp, CreditCard, Trash2, AlertCircle
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const STATUS_CONFIG = {
   paid:      { label: 'Paid',      color: 'bg-green-100 text-green-700 border border-green-200', icon: CheckCircle },
@@ -90,6 +91,11 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set([format(now, 'MMMM yyyy')]));
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [cancelConfirm, setCancelConfirm] = useState<{
+    isOpen: boolean;
+    orderId: string | null;
+    isPaid: boolean;
+  }>({ isOpen: false, orderId: null, isPaid: false });
 
   if (!mounted) {
     return (
@@ -146,12 +152,7 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
     }
   }
 
-  async function handleCancel(orderId: string, isPaid: boolean) {
-    const msg = isPaid
-      ? 'Cancel this order? The full amount will be refunded as store credit.'
-      : 'Cancel this pending order?';
-    if (!confirm(msg)) return;
-
+  async function handleCancelExecute(orderId: string, isPaid: boolean) {
     setLoadingAction('cancel-' + orderId);
     try {
       const res = await fetch('/api/orders/cancel', {
@@ -159,17 +160,28 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: orderId }),
       });
-      const data = await res.json();
-      if (data.success) {
+      
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Server returned an invalid response. Please contact support.');
+      }
+
+      if (res.ok && data.success) {
         if (data.refund_amount > 0) {
-          alert(`Order cancelled. $${data.refund_amount.toFixed(2)} credit added to your account.`);
+          toast.success(`Order cancelled. $${data.refund_amount.toFixed(2)} credit added to your account.`);
+        } else {
+          toast.success('Pending order cancelled successfully.');
         }
+        setCancelConfirm({ isOpen: false, orderId: null, isPaid: false });
         startTransition(() => router.refresh());
       } else {
-        alert(data.error || 'Failed to cancel order');
+        toast.error(data.error || 'Failed to cancel order');
       }
-    } catch {
-      alert('Network error. Please try again.');
+    } catch (err: any) {
+      console.error('Cancellation error:', err);
+      toast.error(err.message || 'Network error. Please try again.');
     } finally {
       setLoadingAction(null);
     }
@@ -396,7 +408,7 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
                                   {/* Cancel */}
                                   {showCancel && (
                                     <button
-                                      onClick={() => handleCancel(order.id, order.status === 'paid')}
+                                      onClick={() => setCancelConfirm({ isOpen: true, orderId: order.id, isPaid: order.status === 'paid' })}
                                       disabled={isCancelLoading || isPending}
                                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold transition-colors disabled:opacity-50"
                                     >
@@ -421,6 +433,49 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
               </div>
             );
           })}
+        </div>
+      )}
+      {/* Cancellation Confirmation Modal */}
+      {cancelConfirm.isOpen && cancelConfirm.orderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card border shadow-2xl rounded-3xl w-full max-w-md overflow-hidden flex flex-col p-6 gap-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="bg-red-500/10 p-3 rounded-2xl text-red-600">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-xl text-slate-900">Cancel Order</h3>
+                <p className="text-xs font-bold text-slate-500 mt-0.5">
+                  Confirm cancellation
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 font-medium">
+              {cancelConfirm.isPaid
+                ? 'Are you sure you want to cancel this order? The full amount will be refunded as store credit to your account.'
+                : 'Are you sure you want to cancel this pending order? (No charge has been made for this order.)'}
+            </p>
+
+            <div className="flex items-center justify-end gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setCancelConfirm({ isOpen: false, orderId: null, isPaid: false })}
+                disabled={loadingAction === 'cancel-' + cancelConfirm.orderId}
+                className="px-4 py-2 text-sm font-bold hover:bg-muted rounded-xl transition-colors disabled:opacity-50"
+              >
+                No, Keep
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCancelExecute(cancelConfirm.orderId!, cancelConfirm.isPaid)}
+                disabled={loadingAction === 'cancel-' + cancelConfirm.orderId}
+                className="px-4 py-2 text-sm font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {loadingAction === 'cancel-' + cancelConfirm.orderId ? 'Cancelling...' : 'Yes, Cancel'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
