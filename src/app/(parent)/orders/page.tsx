@@ -121,7 +121,7 @@ export default async function ParentOrdersPage({
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">My Orders</h1>
         <p className="text-muted-foreground mt-1">
-          View and manage your lunch orders. Cancel paid orders up to 2 days before the meal date for full store credit.
+          View and manage your lunch orders. Cancel paid orders up to 3 days before the meal date (e.g., cancel on or before June 26 for a June 29 order) for full store credit.
         </p>
         {searchParams.success === 'true' && (
           <div className="mt-3 flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 px-4 py-2.5 rounded-xl">

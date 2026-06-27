@@ -28,15 +28,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Order cannot be cancelled' }, { status: 400 });
   }
 
-  // Must be at least 2 days in the future
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const orderDate = new Date(order.order_date + 'T12:00:00');
-  const twoDaysAhead = new Date(today);
-  twoDaysAhead.setDate(twoDaysAhead.getDate() + 2);
+  // Must be cancelled at least 3 calendar days before the meal date (e.g. cancel June 29 order on/before June 26)
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+  const orderDateUtc = new Date(order.order_date + 'T00:00:00Z');
+  const todayDateUtc = new Date(todayStr + 'T00:00:00Z');
+  const diffTime = orderDateUtc.getTime() - todayDateUtc.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-  if (orderDate < twoDaysAhead) {
-    return NextResponse.json({ error: 'Orders can only be cancelled at least 2 days before the meal date' }, { status: 400 });
+  if (diffDays < 3) {
+    return NextResponse.json({ error: 'Orders can only be cancelled up to 3 days before the meal date (e.g., June 29 orders must be cancelled on or before June 26)' }, { status: 400 });
   }
 
   // Mark as cancelled

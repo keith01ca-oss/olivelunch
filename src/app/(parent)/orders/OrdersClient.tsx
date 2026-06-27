@@ -189,11 +189,12 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
 
   function canCancel(order: Order): boolean {
     if (!['paid', 'pending'].includes(order.status)) return false;
-    const orderDate = new Date(order.order_date + 'T12:00:00');
-    const twoDaysAhead = new Date(now);
-    twoDaysAhead.setDate(twoDaysAhead.getDate() + 2);
-    twoDaysAhead.setHours(0, 0, 0, 0);
-    return orderDate >= twoDaysAhead;
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+    const orderDateUtc = new Date(order.order_date + 'T00:00:00Z');
+    const todayDateUtc = new Date(todayStr + 'T00:00:00Z');
+    const diffTime = orderDateUtc.getTime() - todayDateUtc.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 3;
   }
 
   function isExpiredPending(order: Order): boolean {
