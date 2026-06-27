@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import {
@@ -10,7 +10,7 @@ import {
 
 const STATUS_CONFIG = {
   paid:      { label: 'Paid',      color: 'bg-green-100 text-green-700 border border-green-200', icon: CheckCircle },
-  pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-700 border border-yellow-200', icon: Clock },
+  pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-700 border border-green-200', icon: Clock },
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700 border border-red-200', icon: XCircle },
   refunded:  { label: 'Refunded',  color: 'bg-blue-100 text-blue-700 border border-blue-200', icon: RefreshCcw },
   expired:   { label: 'Expired',   color: 'bg-gray-100 text-gray-500 border border-gray-200', icon: AlertCircle },
@@ -68,6 +68,11 @@ function sortMonths(groups: MonthGroup[], currentYear: number, currentMonth: num
 }
 
 export default function OrdersClient({ orders: initialOrders, creditBalance, lockedCredit = 0 }: { orders: Order[]; creditBalance: number; lockedCredit?: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const router = useRouter();
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -85,6 +90,14 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set([format(now, 'MMMM yyyy')]));
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  if (!mounted) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Filter by selected year
   const yearOrders = initialOrders.filter(

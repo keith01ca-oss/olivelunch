@@ -12,12 +12,14 @@ export async function POST(req: NextRequest) {
   if (!order_id) return NextResponse.json({ error: 'order_id required' }, { status: 400 });
 
   // Fetch the order
-  const { data: order, error } = await supabaseAdmin
+  const { data: orderData, error } = await supabaseAdmin
     .from('orders')
     .select('id, parent_id, status, order_date, total_amount, gross_amount, credit_used')
     .eq('id', order_id)
     .eq('parent_id', parentId || '')
     .single();
+
+  const order = orderData as any;
 
   if (error || !order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
   // Mark as cancelled
   const { error: cancelError } = await supabaseAdmin
     .from('orders')
-    .update({ status: 'cancelled' })
+    .update({ status: 'cancelled' } as any)
     .eq('id', order_id);
 
   if (cancelError) return NextResponse.json({ error: 'Failed to cancel order' }, { status: 500 });
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
       amount: refundAmount,
       source: 'refund',  // must match DB enum: 'referral'|'coupon'|'refund'|'manual'|'season_proration'|'order_usage'
       order_id: order.id,
-    });
+    } as any);
     if (creditError) {
       console.error('Failed to insert refund credit:', creditError);
       return NextResponse.json({ error: 'Order cancelled but credit refund failed. Please contact support.' }, { status: 500 });
