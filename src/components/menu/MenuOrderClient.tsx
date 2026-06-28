@@ -500,11 +500,11 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       const data = await res.json();
 
       if (data.error) { alert(data.error); return; }
-      if (data.stripe_url) {
+      if (data.client_secret) {
         // Clear cart from localStorage BEFORE leaving (so it's gone when we return)
         try { localStorage.removeItem(`olive_cart_${selectedChildId}`); } catch (e) {}
         setCart({});
-        window.location.href = data.stripe_url;
+        router.push(`/checkout?client_secret=${data.client_secret}`);
       } else if (data.success) {
         // Zero-cost order (paid via credit) — clear cart and go to dashboard
         try { localStorage.removeItem(`olive_cart_${selectedChildId}`); } catch (e) {}

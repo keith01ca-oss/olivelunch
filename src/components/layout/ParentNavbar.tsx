@@ -22,12 +22,9 @@ export function ParentNavbar({ isAdmin = false }: { isAdmin?: boolean }) {
       {/* Top Navbar (Desktop) & Header (Mobile) */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-lg shadow-sm">
-              O
-            </div>
-            <span className="text-xl font-semibold tracking-tight text-primary">Olive Lunch</span>
-          </div>
+          <a href="https://www.olivelunch.com" target="_blank" rel="noopener noreferrer" className="flex items-center hover:opacity-90 transition-opacity">
+            <img src="/logo.jpg" alt="Olive Lunch" className="h-10 w-auto" />
+          </a>
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6">

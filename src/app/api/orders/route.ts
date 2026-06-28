@@ -308,6 +308,7 @@ export async function POST(req: NextRequest) {
     // 2. IS THIS A NORMAL PAID ORDER?
     // Create Stripe Checkout Session FIRST to get the ID
     const session = await stripe.checkout.sessions.create({
+      ui_mode: 'embedded',
       payment_method_types: ['card'],
       line_items: [
         {
@@ -323,8 +324,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${req.headers.get('origin')}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get('origin')}/dashboard?canceled=true`,
+      return_url: `${req.headers.get('origin')}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
         parentId,
         creditToUse: creditToUse.toString(),
@@ -339,7 +339,7 @@ export async function POST(req: NextRequest) {
       .update({ stripe_session_id: session.id })
       .in('id', insertedOrders.map(o => o.id));
 
-    return NextResponse.json({ success: true, stripe_url: session.url });
+    return NextResponse.json({ success: true, client_secret: session.client_secret });
 
   } catch (error: any) {
     console.error('Order creation error:', error);
