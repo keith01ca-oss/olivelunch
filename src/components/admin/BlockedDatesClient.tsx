@@ -51,6 +51,19 @@ export default function BlockedDatesClient({ initialBlockedDates, initialProDRan
   const [warnMessage, setWarnMessage] = useState('');
   const [warnLoading, setWarnLoading] = useState(false);
 
+  // Custom confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
   const handleAddDate = async () => {
     if (!newDate || !newReason) return;
     setDateLoading(true);
@@ -62,11 +75,18 @@ export default function BlockedDatesClient({ initialBlockedDates, initialProDRan
     setNewReason('');
   };
 
-  const handleDeleteDate = async (id: string) => {
-    if (!confirm('Remove this blocked date?')) return;
-    const res = await deleteBlockedDate(id);
-    if (res.error) return alert(res.error);
-    setBlockedDates(prev => prev.filter(d => d.id !== id));
+  const handleDeleteDate = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Blocked Date',
+      message: 'Are you sure you want to remove this blocked date? Parents will be able to order meals on this date again.',
+      onConfirm: async () => {
+        const res = await deleteBlockedDate(id);
+        if (res.error) return alert(res.error);
+        setBlockedDates(prev => prev.filter(d => d.id !== id));
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleAddRange = async () => {
@@ -81,11 +101,18 @@ export default function BlockedDatesClient({ initialBlockedDates, initialProDRan
     setRangeMessage('');
   };
 
-  const handleDeleteRange = async (id: string) => {
-    if (!confirm('Remove this date range?')) return;
-    const res = await deleteProDRange(id);
-    if (res.error) return alert(res.error);
-    setProdRanges(prev => prev.filter(r => r.id !== id));
+  const handleDeleteRange = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Date Range',
+      message: 'Are you sure you want to remove this date range? Ordering will be re-enabled on these dates.',
+      onConfirm: async () => {
+        const res = await deleteProDRange(id);
+        if (res.error) return alert(res.error);
+        setProdRanges(prev => prev.filter(r => r.id !== id));
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleAddWarning = async () => {
@@ -99,11 +126,18 @@ export default function BlockedDatesClient({ initialBlockedDates, initialProDRan
     setWarnMessage('');
   };
 
-  const handleDeleteWarning = async (id: string) => {
-    if (!confirm('Remove this warning?')) return;
-    const res = await deleteDateWarning(id);
-    if (res.error) return alert(res.error);
-    setDateWarnings(prev => prev.filter(w => w.id !== id));
+  const handleDeleteWarning = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Date Warning',
+      message: 'Are you sure you want to remove this warning? The notice banner will be removed from this date.',
+      onConfirm: async () => {
+        const res = await deleteDateWarning(id);
+        if (res.error) return alert(res.error);
+        setDateWarnings(prev => prev.filter(w => w.id !== id));
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const formatDate = (dateStr: string) => {
@@ -271,6 +305,37 @@ export default function BlockedDatesClient({ initialBlockedDates, initialProDRan
           <p>Changes take effect immediately. No restart required.</p>
         </div>
       </div>
+
+      {/* Custom Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fade-in no-print">
+          <div className="bg-card border rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-scale-in">
+            <div className="flex items-center gap-3 text-red-500">
+              <div className="bg-red-500/10 p-2.5 rounded-xl">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="font-extrabold text-lg text-slate-900">{confirmModal.title}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {confirmModal.message}
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 rounded-xl text-sm font-semibold border hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
