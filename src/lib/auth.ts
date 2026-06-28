@@ -56,13 +56,19 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
   const role = ((session.sessionClaims?.metadata as any)?.role as UserRole) || 'parent';
 
   // 3. Resolve parent_id from clerk_user_id
-  const { data: parent, error } = await supabaseAdmin
+  const { data: parents, error } = await supabaseAdmin
     .from('parents')
     .select('id')
-    .eq('clerk_user_id', clerkUserId)
-    .single();
+    .eq('clerk_user_id', clerkUserId);
 
-  if (error || !parent) {
+  if (error) {
+    console.error('Database error looking up parent:', error);
+    return { error: `Failed to look up parent profile: ${error.message}`, status: 500 };
+  }
+
+  const parent = parents?.[0];
+
+  if (!parent) {
     if (role === 'admin' || role === 'kitchen') {
       return { clerkUserId, role, parentId: null };
     }
