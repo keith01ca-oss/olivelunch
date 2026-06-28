@@ -112,6 +112,15 @@ export async function POST(req: NextRequest) {
     
     const dishMap = new Map(dishes.map(d => [d.id, d]));
 
+    // Fetch blocked dates and ranges for backend validation
+    const uniqueDates = Array.from(new Set(orders.map(o => o.order_date)));
+    const [blockedRes, rangesRes] = await Promise.all([
+      supabaseAdmin.from('blocked_dates').select('date').in('date', uniqueDates),
+      supabaseAdmin.from('pro_d_ranges').select('start_date, end_date')
+    ]);
+    const blockedDatesSet = new Set(blockedRes.data?.map(d => d.date) || []);
+    const proDRanges = rangesRes.data || [];
+
     // Check cutoff time (1:00 PM prior day)
     const now = new Date();
     // Assuming local timezone logic here, or strictly server time
@@ -126,15 +135,36 @@ export async function POST(req: NextRequest) {
     const maxOrderDateStr = maxOrderDate.toISOString().split('T')[0];
 
     for (const order of orders) {
-      // Validate date cutoff
-      const orderDate = new Date(order.order_date);
-      const yesterday = new Date(orderDate);
+      const orderDateStr = order.order_date;
+      
+      // 1. Validate Weekend
+      // 'YYYY-MM-DD' parsed as UTC midnight
+      const orderDate = new Date(orderDateStr);
+      const dayOfWeek = orderDate.getUTCDay(); 
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+         return NextResponse.json({ error: `Cannot order on weekends (${orderDateStr}).` }, { status: 400 });
+      }
+
+      // 2. Validate Blocked Dates (Holidays)
+      if (blockedDatesSet.has(orderDateStr)) {
+         return NextResponse.json({ error: `Orders are closed on this date (${orderDateStr}).` }, { status: 400 });
+      }
+
+      // 3. Validate Pro-D Ranges
+      for (const r of proDRanges) {
+         if (orderDateStr >= r.start_date && orderDateStr <= r.end_date) {
+            return NextResponse.json({ error: `Orders are closed for a holiday range covering ${orderDateStr}.` }, { status: 400 });
+         }
+      }
+
+      // 4. Validate date cutoff
+      const yesterday = new Date(orderDateStr);
       yesterday.setDate(yesterday.getDate() - 1);
       
       const yesterdayStr = yesterday.toISOString().split('T')[0];
       
       if (todayStr > yesterdayStr || (todayStr === yesterdayStr && currentHour >= 13)) {
-         return NextResponse.json({ error: `Cutoff passed for order date ${order.order_date}` }, { status: 400 });
+         return NextResponse.json({ error: `Cutoff passed for order date ${orderDateStr}` }, { status: 400 });
       }
 
       let orderGross = 0;
