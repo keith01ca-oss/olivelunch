@@ -82,7 +82,7 @@ export async function getOutstandingCredits() {
     throw new Error('Failed to fetch parents');
   }
 
-  const result = parents
+  const result = (parents || [])
     .map(p => ({
       id: p.id,
       name: p.name,

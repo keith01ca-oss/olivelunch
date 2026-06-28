@@ -43,14 +43,16 @@ export function getBCHolidays(year: number) {
   const easterMonday = new Date(easterSunday.getTime() + 1 * 24 * 60 * 60 * 1000);
   const emMonth = easterMonday.getUTCMonth() + 1;
   const emDay = easterMonday.getUTCDate();
-  holidays.push({ date: `${year}-${String(emMonth).padStart(2, '0')}-${String(emDay).padStart(2, '0')}`, name: "Easter Monday" });
+  holidays.push({ date: `${year}-${String(emMonth).padStart(2, '0')}-${String(emDay).padStart(2, '0')}`, name: "Easter Monday (School Holiday)" });
 
   // 4. Victoria Day - Monday preceding May 25
-  const may24 = new Date(Date.UTC(year, 4, 24));
-  const may24Day = may24.getUTCDay();
-  const vicDayOffset = (may24Day - 1 + 7) % 7;
-  const vicDayDate = 24 - vicDayOffset;
-  holidays.push({ date: `${year}-05-${String(vicDayDate).padStart(2, '0')}`, name: "Victoria Day" });
+  const may25 = new Date(Date.UTC(year, 4, 25));
+  const may25Day = may25.getUTCDay();
+  const daysToSubtract = may25Day === 1 ? 7 : (may25Day - 1 + 7) % 7;
+  const vicDay = new Date(may25.getTime() - daysToSubtract * 24 * 60 * 60 * 1000);
+  const vicMonth = vicDay.getUTCMonth() + 1;
+  const vicDate = vicDay.getUTCDate();
+  holidays.push({ date: `${year}-${String(vicMonth).padStart(2, '0')}-${String(vicDate).padStart(2, '0')}`, name: "Victoria Day" });
 
   // 5. Canada Day - July 1
   holidays.push({ date: `${year}-07-01`, name: "Canada Day" });
@@ -86,15 +88,17 @@ export function getBCHolidays(year: number) {
   holidays.push({ date: `${year}-12-25`, name: "Christmas Day" });
 
   // 12. Boxing Day - Dec 26
-  holidays.push({ date: `${year}-12-26`, name: "Boxing Day" });
+  holidays.push({ date: `${year}-12-26`, name: "Boxing Day (School Holiday)" });
 
   return holidays;
 }
 
 export async function syncBCHolidays() {
   try {
-    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
-    const [currentYear, currentMonth] = todayStr.split('-').map(Number);
+    const today = new Date();
+    // Resolve year/month safely using timezone-independent getters
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
 
     // Get holidays for current and next year
     const holidays = [
@@ -112,6 +116,7 @@ export async function syncBCHolidays() {
 
     if (upsertError) {
       console.error('syncBCHolidays: DB upsert error:', upsertError);
+      return { error: upsertError };
     }
 
     // 2. Delete old blocked dates where month has passed

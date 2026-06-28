@@ -7,19 +7,27 @@ export const revalidate = 0;
 
 export default async function AdminBlockedDatesPage() {
   // Automatically sync public holidays and clear old months on page load
-  await syncBCHolidays();
+  try {
+    await syncBCHolidays();
+  } catch (err) {
+    console.error('Failed to sync holidays on page load:', err);
+  }
 
-  const [{ data: blockedDates }, { data: prodRanges }, { data: dateWarnings }] = await Promise.all([
+  const [blockedDatesRes, prodRangesRes, dateWarningsRes] = await Promise.all([
     supabaseAdmin.from('blocked_dates').select('*').order('date'),
     supabaseAdmin.from('pro_d_ranges').select('*').order('start_date'),
     supabaseAdmin.from('date_warnings').select('*').order('date'),
   ]);
 
+  if (blockedDatesRes.error) console.error('Error fetching blocked dates:', blockedDatesRes.error);
+  if (prodRangesRes.error) console.error('Error fetching pro-d ranges:', prodRangesRes.error);
+  if (dateWarningsRes.error) console.error('Error fetching date warnings:', dateWarningsRes.error);
+
   return (
     <BlockedDatesClient
-      initialBlockedDates={blockedDates || []}
-      initialProDRanges={prodRanges || []}
-      initialDateWarnings={dateWarnings || []}
+      initialBlockedDates={blockedDatesRes.data || []}
+      initialProDRanges={prodRangesRes.data || []}
+      initialDateWarnings={dateWarningsRes.data || []}
     />
   );
 }

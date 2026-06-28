@@ -4,20 +4,29 @@ import { syncBCHolidays } from '@/lib/holidays';
 export async function GET(req: NextRequest) {
   // 1. Authorization check
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    console.error('sync-holidays cron: Unauthorized attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // 2. Call holiday sync
-  const res = await syncBCHolidays();
-  
-  if (res.error) {
-    console.error('syncBCHolidays cron error:', res.error);
-    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
-  }
+  try {
+    const res = await syncBCHolidays();
+    
+    if (res && res.error) {
+      console.error('syncBCHolidays cron error:', res.error);
+      return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
+    }
 
-  return NextResponse.json({
-    success: true,
-    message: 'Public holidays synced successfully'
-  });
+    console.log('sync-holidays cron: Public holidays synced successfully');
+    return NextResponse.json({
+      success: true,
+      message: 'Public holidays synced successfully'
+    });
+  } catch (err) {
+    console.error('syncBCHolidays cron unexpected error:', err);
+    return NextResponse.json({ error: 'Internal server error during sync' }, { status: 500 });
+  }
 }
