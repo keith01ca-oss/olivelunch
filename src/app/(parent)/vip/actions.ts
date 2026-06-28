@@ -249,7 +249,7 @@ export async function processVipCancellation(
         }`,
       };
     } else if (option === 'pay_difference') {
-      // 1. Query all future orders (from today onwards)
+      // 1a. Query all future PAID orders (from today onwards) — must charge difference
       const { data: orders } = await supabaseAdmin
         .from('orders')
         .select(`
@@ -272,6 +272,31 @@ export async function processVipCancellation(
         `)
         .eq('parent_id', parentId)
         .eq('status', 'paid')
+        .gte('order_date', todayStr);
+
+      // 1b. Query all future PENDING orders (from today onwards) — reprice to reg, no charge needed
+      const { data: pendingOrders } = await supabaseAdmin
+        .from('orders')
+        .select(`
+          id,
+          gross_amount,
+          total_amount,
+          credit_used,
+          order_items (
+            id,
+            quantity,
+            is_large,
+            dishes (
+              price_regular,
+              price_vip,
+              large_price_regular,
+              large_price_vip,
+              has_large
+            )
+          )
+        `)
+        .eq('parent_id', parentId)
+        .eq('status', 'pending')
         .gte('order_date', todayStr);
 
       let differenceToCharge = 0;
@@ -303,9 +328,11 @@ export async function processVipCancellation(
       // to let the user review and pay the difference securely.
       const chargeSuccessful = false;
 
-      // 3. If there is a price difference, create a Stripe Checkout session.
+      // 3. If there is a price difference on paid orders, create a Stripe Checkout session.
+      //    Pending orders will be repriced by the webhook after payment completes.
       if (differenceToCharge > 0 && !chargeSuccessful) {
         const appUrl = origin || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        const pendingOrderIds = (pendingOrders || []).map(o => o.id).join(',');
         const session = await stripe.checkout.sessions.create({
           payment_method_types: ['card'],
           line_items: [
@@ -327,6 +354,7 @@ export async function processVipCancellation(
           metadata: {
             action: 'vip_cancel_difference',
             parentId: parentId,
+            pendingOrderIds,
             ...(subId ? { subId } : {})
           }
         });
@@ -347,9 +375,10 @@ export async function processVipCancellation(
         }
       }
 
-      // Revert order item prices
-      if (orders && orders.length > 0) {
-        for (const order of orders) {
+      // Helper to reprice all orders in a list to regular pricing
+      const repriceOrdersToRegular = async (orderList: typeof orders) => {
+        if (!orderList || orderList.length === 0) return;
+        for (const order of orderList) {
           let orderNewGross = 0;
           for (const item of (order.order_items || [])) {
             const dish = (item as any).dishes;
@@ -369,7 +398,13 @@ export async function processVipCancellation(
             total_amount: orderNewGross - Number(order.credit_used),
           }).eq('id', order.id);
         }
-      }
+      };
+
+      // Revert PAID future orders to regular pricing
+      await repriceOrdersToRegular(orders);
+
+      // Revert PENDING future orders to regular pricing (no charge needed — not paid yet)
+      await repriceOrdersToRegular(pendingOrders);
 
       // Strip VIP
       await supabaseAdmin
@@ -389,7 +424,7 @@ export async function processVipCancellation(
         success: true,
         message: differenceToCharge > 0
           ? `VIP cancelled. A difference of $${differenceToCharge.toFixed(2)} was charged to your card on file. Your orders have been updated to regular pricing.`
-          : 'VIP cancelled. Your future orders remain at regular pricing.',
+          : 'VIP cancelled. Your future orders (paid and pending) have been updated to regular pricing.',
       };
     }
 

@@ -55,23 +55,17 @@ export async function POST(req: NextRequest) {
         if (session.metadata?.action === 'vip_cancel_difference') {
           const parentId = session.metadata.parentId;
           const subId = session.metadata.subId;
-          if (parentId) {
-            // 1. Fetch paid future orders (from today onwards) and revert their prices to regular
-            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
-            const { data: futureOrders } = await supabaseAdmin
-              .from('orders')
-              .select(`
-                id, gross_amount, credit_used,
-                order_items ( id, quantity, is_large,
-                  dishes ( price_regular, price_vip, large_price_regular, large_price_vip, has_large )
-                )
-              `)
-              .eq('parent_id', parentId)
-              .eq('status', 'paid')
-              .gte('order_date', todayStr);
+          const pendingOrderIds = session.metadata.pendingOrderIds
+            ? session.metadata.pendingOrderIds.split(',').filter(Boolean)
+            : [];
 
-            if (futureOrders && futureOrders.length > 0) {
-              for (const order of futureOrders) {
+          if (parentId) {
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' });
+
+            // Helper: reprice a list of fetched orders to regular pricing
+            const repriceOrders = async (fetchedOrders: any[] | null) => {
+              if (!fetchedOrders || fetchedOrders.length === 0) return;
+              for (const order of fetchedOrders) {
                 let newGross = 0;
                 for (const item of (order.order_items || [])) {
                   const dish = (item as any).dishes;
@@ -87,21 +81,53 @@ export async function POST(req: NextRequest) {
                   }).eq('id', item.id);
                 }
                 await supabaseAdmin.from('orders').update({
-                  status: 'paid',
                   gross_amount: newGross,
                   total_amount: newGross - Number(order.credit_used),
                 }).eq('id', order.id);
               }
+            };
+
+            // 1. Fetch paid future orders and revert their prices to regular
+            const { data: futureOrders } = await supabaseAdmin
+              .from('orders')
+              .select(`
+                id, gross_amount, credit_used,
+                order_items ( id, quantity, is_large,
+                  dishes ( price_regular, price_vip, large_price_regular, large_price_vip, has_large )
+                )
+              `)
+              .eq('parent_id', parentId)
+              .eq('status', 'paid')
+              .gte('order_date', todayStr);
+
+            await repriceOrders(futureOrders);
+
+            // 2. Fetch pending orders (by IDs stored in metadata) and reprice to regular
+            //    These are orders that were placed at VIP price but not yet paid.
+            if (pendingOrderIds.length > 0) {
+              const { data: pendingOrders } = await supabaseAdmin
+                .from('orders')
+                .select(`
+                  id, gross_amount, credit_used,
+                  order_items ( id, quantity, is_large,
+                    dishes ( price_regular, price_vip, large_price_regular, large_price_vip, has_large )
+                  )
+                `)
+                .in('id', pendingOrderIds)
+                .eq('parent_id', parentId)
+                .eq('status', 'pending');
+
+              await repriceOrders(pendingOrders);
             }
 
-            // 2. Cancel the Stripe subscription
+            // 3. Cancel the Stripe subscription
             if (subId) {
               try { await stripe.subscriptions.cancel(subId); } catch (e) {
                 console.warn('Webhook: failed to cancel stripe subscription:', e);
               }
             }
 
-            // 3. Strip VIP from parent
+            // 4. Strip VIP from parent
             await supabaseAdmin.from('parents').update({
               is_vip: false,
               stripe_subscription_id: null,
