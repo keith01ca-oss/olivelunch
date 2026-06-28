@@ -2,23 +2,61 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Script from 'next/script';
+
+// Helper to load Stripe script safely and return the Stripe instance
+const loadStripeInstance = (publishableKey: string) => {
+  return new Promise<any>((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      resolve(null);
+      return;
+    }
+    if ((window as any).Stripe) {
+      resolve((window as any).Stripe(publishableKey));
+      return;
+    }
+    // Check if script is already in document
+    const existingScript = document.querySelector('script[src="https://js.stripe.com/v3/"]');
+    if (existingScript) {
+      // If script exists but window.Stripe is not yet loaded, wait for it
+      let attempts = 0;
+      const interval = setInterval(() => {
+        if ((window as any).Stripe) {
+          clearInterval(interval);
+          resolve((window as any).Stripe(publishableKey));
+        }
+        attempts++;
+        if (attempts > 50) {
+          clearInterval(interval);
+          reject(new Error('Stripe.js failed to load.'));
+        }
+      }, 100);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://js.stripe.com/v3/';
+    script.async = true;
+    script.onload = () => {
+      if ((window as any).Stripe) {
+        resolve((window as any).Stripe(publishableKey));
+      } else {
+        reject(new Error('Stripe.js was loaded but window.Stripe is undefined.'));
+      }
+    };
+    script.onerror = () => reject(new Error('Failed to load Stripe.js script.'));
+    document.head.appendChild(script);
+  });
+};
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const clientSecret = searchParams.get('client_secret');
-  const [stripeLoaded, setStripeLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
   const checkoutMounted = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).Stripe) {
-      setStripeLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!stripeLoaded || !clientSecret || checkoutMounted.current) return;
+    if (!clientSecret || checkoutMounted.current) return;
 
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     if (!publishableKey) {
@@ -26,21 +64,40 @@ function CheckoutContent() {
       return;
     }
 
+    let active = true;
+    let checkoutInstance: any = null;
+
     const initStripeCheckout = async () => {
       try {
-        const stripe = (window as any).Stripe(publishableKey);
-        const checkout = await stripe.initEmbeddedCheckout({
+        const stripe = await loadStripeInstance(publishableKey);
+        if (!stripe || !active) return;
+
+        checkoutInstance = await stripe.initEmbeddedCheckout({
           clientSecret,
         });
-        checkout.mount('#checkout');
-        checkoutMounted.current = true;
+        if (active) {
+          checkoutInstance.mount('#checkout');
+          checkoutMounted.current = true;
+          setLoading(false);
+        }
       } catch (err) {
         console.error('Failed to initialize Stripe checkout:', err);
       }
     };
 
     initStripeCheckout();
-  }, [stripeLoaded, clientSecret]);
+
+    return () => {
+      active = false;
+      if (checkoutInstance) {
+        try {
+          checkoutInstance.destroy();
+        } catch (e) {
+          // ignore destroy errors
+        }
+      }
+    };
+  }, [clientSecret]);
 
   if (!clientSecret) {
     return (
@@ -56,11 +113,6 @@ function CheckoutContent() {
 
   return (
     <div className="max-w-2xl mx-auto my-6 animate-fade-in-up">
-      <Script
-        src="https://js.stripe.com/v3/"
-        onLoad={() => setStripeLoaded(true)}
-      />
-      
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Secure Checkout</h1>
@@ -75,7 +127,7 @@ function CheckoutContent() {
       </div>
 
       <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 min-h-[400px] flex flex-col justify-center">
-        {!stripeLoaded && (
+        {loading && (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p className="mt-4 text-sm text-muted-foreground font-medium">Loading checkout form...</p>
