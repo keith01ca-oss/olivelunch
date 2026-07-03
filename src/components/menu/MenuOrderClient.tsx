@@ -1205,7 +1205,7 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                   onClick={() => router.push('/cart')}
                   className="bg-primary text-primary-foreground font-bold px-3 py-2 sm:px-6 sm:py-2.5 rounded-xl hover:bg-primary/90 transition-colors shadow-lg text-xs sm:text-base whitespace-nowrap"
                 >
-                  <span className="inline sm:hidden">Checkout →</span>
+                  <span className="inline sm:hidden">Add to Cart</span>
                   <span className="hidden sm:inline">Review Cart & Checkout →</span>
                 </button>
               </div>
