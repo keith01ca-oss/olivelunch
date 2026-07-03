@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { 
   Search, Download, FileText, CheckCircle, Clock, XCircle, 
@@ -70,6 +70,13 @@ export default function OrdersClient({
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [isAddingOrder, setIsAddingOrder] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 100;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, dateFilter, sortBy]);
+
   const toggleExpanded = (id: string) => {
     setExpandedIds(prev => {
       const next = new Set(prev);
@@ -118,6 +125,13 @@ export default function OrdersClient({
       return 0;
     });
   }, [orders, search, statusFilter, dateFilter, sortBy]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
 
   const updateStatus = async (ids: string[], newStatus: OrderStatus) => {
     if (ids.length === 0) return;
@@ -486,8 +500,9 @@ export default function OrdersClient({
         {filtered.length === 0 ? (
           <div className="py-16 text-center text-muted-foreground">No orders found.</div>
         ) : (
-          <div className="divide-y">
-            {filtered.map(order => {
+          <div>
+            <div className="divide-y">
+              {paginatedOrders.map(order => {
               const isExpanded = expandedIds.has(order.id);
               const isSelected = selectedIds.has(order.id);
               const cfg = STATUS_CONFIG[order.status];
@@ -601,6 +616,64 @@ export default function OrdersClient({
                 </div>
               );
             })}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 bg-muted/20 border-t flex items-center justify-between gap-4">
+                <span className="text-xs text-muted-foreground">
+                  Showing <span className="font-semibold">{Math.min(filtered.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</span> to{' '}
+                  <span className="font-semibold">{Math.min(filtered.length, currentPage * ITEMS_PER_PAGE)}</span> of{' '}
+                  <span className="font-semibold">{filtered.length}</span> orders
+                </span>
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 rounded-lg border bg-card text-xs hover:bg-muted disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const pageNum = i + 1;
+                    if (
+                      totalPages > 6 &&
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - currentPage) > 1
+                    ) {
+                      if (pageNum === 2 && currentPage > 3) {
+                        return <span key="ellipsis-start" className="text-muted-foreground px-1 text-xs">...</span>;
+                      }
+                      if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                        return <span key="ellipsis-end" className="text-muted-foreground px-1 text-xs">...</span>;
+                      }
+                      return null;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-primary text-primary-foreground font-bold'
+                            : 'border bg-card hover:bg-muted'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 rounded-lg border bg-card text-xs hover:bg-muted disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
