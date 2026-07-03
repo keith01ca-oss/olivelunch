@@ -19,7 +19,7 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   is_large?: boolean;
-  dishes: { id: string; name: string; category: string; large_name?: string | null } | null;
+  dishes: { id: string; name: string; category: string; large_name?: string | null; label_components?: string[] | null } | null;
 }
 
 interface Order {
@@ -200,20 +200,36 @@ export default function OrdersClient({
     const labelItems: any[] = [];
     paidOrders.forEach(o => {
       o.order_items.forEach(item => {
-        labelItems.push({ 
-          order: o, 
-          item, 
-          school: o.children?.schools?.name || '', 
-          route: o.children?.schools?.school_routes?.[0]?.routes?.route_number || '',
-          stopOrder: o.children?.schools?.school_routes?.[0]?.stop_order || 0
-        });
+        const comps = item.dishes?.label_components;
+        if (comps && comps.length > 0) {
+          comps.forEach((compName, idx) => {
+            labelItems.push({ 
+              order: o, 
+              item, 
+              school: o.children?.schools?.name || '', 
+              route: o.children?.schools?.school_routes?.[0]?.routes?.route_number || '',
+              stopOrder: o.children?.schools?.school_routes?.[0]?.stop_order || 0,
+              componentName: compName,
+              componentIndex: idx + 1,
+              componentTotal: comps.length
+            });
+          });
+        } else {
+          labelItems.push({ 
+            order: o, 
+            item, 
+            school: o.children?.schools?.name || '', 
+            route: o.children?.schools?.school_routes?.[0]?.routes?.route_number || '',
+            stopOrder: o.children?.schools?.school_routes?.[0]?.stop_order || 0
+          });
+        }
       });
     });
 
     // Sort labels for production efficiency: Dish Name > School > Date > Route
     labelItems.sort((a, b) => {
-      const dishA = a.item.dishes?.name || '';
-      const dishB = b.item.dishes?.name || '';
+      const dishA = a.componentName || a.item.dishes?.name || '';
+      const dishB = b.componentName || b.item.dishes?.name || '';
       if (dishA !== dishB) return dishA.localeCompare(dishB);
       
       if (a.school !== b.school) return a.school.localeCompare(b.school);
@@ -246,6 +262,10 @@ export default function OrdersClient({
           </div>
           <div class="row dish-row">
             ${li.item.quantity}x ${(() => {
+              if (li.componentName) {
+                const suffix = li.componentTotal > 1 ? ` [${li.componentIndex}/${li.componentTotal}]` : '';
+                return li.componentName + suffix;
+              }
               const isLarge = !!li.item.is_large && !!li.item.dishes?.large_name;
               const displayName = isLarge ? li.item.dishes.large_name : (li.item.dishes?.name || '');
               return displayName + (isLarge ? ' <span style="color: #d43b3b; font-weight: bold;">( Lg )</span>' : '');
