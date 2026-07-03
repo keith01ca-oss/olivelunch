@@ -126,9 +126,9 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
       .single();
 
     if (insertError || !newParent) {
-      // If the insert failed due to a duplicate email (user existed with different clerk ID),
-      // find the existing parent by email and re-link their clerk_user_id
       const isEmailConflict = insertError?.code === '23505' && insertError?.message?.includes('email');
+      const isClerkIdConflict = insertError?.code === '23505' && insertError?.message?.includes('clerk_user_id');
+
       if (isEmailConflict && insertPayload.email) {
         const { data: existingByEmail, error: lookupError } = await supabaseAdmin
           .from('parents')
@@ -145,6 +145,18 @@ export async function getResolvedParent(): Promise<AuthContext | { error: string
 
           console.log(`Re-linked clerk_user_id for parent ${existingByEmail.id} (email: ${insertPayload.email})`);
           return { clerkUserId, role, parentId: existingByEmail.id };
+        }
+      } else if (isClerkIdConflict) {
+        // Race condition: another parallel request just provisioned the user. Fetch the newly created parent.
+        const { data: existingByClerkId, error: lookupError } = await supabaseAdmin
+          .from('parents')
+          .select('id')
+          .eq('clerk_user_id', clerkUserId)
+          .single();
+
+        if (!lookupError && existingByClerkId) {
+          console.log(`Resolved clerk_user_id race condition for parent ${existingByClerkId.id}`);
+          return { clerkUserId, role, parentId: existingByClerkId.id };
         }
       }
 

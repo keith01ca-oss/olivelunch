@@ -127,12 +127,7 @@ export async function POST(req: NextRequest) {
     const currentHour = now.getHours();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Max advance window: 60 days. Prevents VIP members from locking in
-    // VIP prices far into the future and then cancelling their subscription.
-    const MAX_ADVANCE_DAYS = 60;
-    const maxOrderDate = new Date(now);
-    maxOrderDate.setDate(maxOrderDate.getDate() + MAX_ADVANCE_DAYS);
-    const maxOrderDateStr = maxOrderDate.toISOString().split('T')[0];
+    // (Advance order limit has been removed)
 
     for (const order of orders) {
       const orderDateStr = order.order_date;
@@ -167,10 +162,7 @@ export async function POST(req: NextRequest) {
          return NextResponse.json({ error: `Cutoff passed for order date ${orderDateStr}` }, { status: 400 });
       }
 
-      // 5. Validate max advance window (60 days)
-      if (orderDateStr > maxOrderDateStr) {
-         return NextResponse.json({ error: `Orders cannot be placed more than ${MAX_ADVANCE_DAYS} days in advance.` }, { status: 400 });
-      }
+      // (Advance window validation removed)
 
       let orderGross = 0;
 
