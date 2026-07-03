@@ -281,8 +281,8 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
             return (
               <div key={group.key} className="bg-card border rounded-2xl shadow-sm overflow-hidden">
                 {/* Month Header */}
-                <div className={`flex items-center justify-between px-5 py-4 ${isCurrentMonth ? 'bg-primary/5 border-b border-primary/10' : 'bg-muted/20 border-b'}`}>
-                  <div className="flex items-center gap-3">
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 ${isCurrentMonth ? 'bg-primary/5 border-b border-primary/10' : 'bg-muted/20 border-b'}`}>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
                       onClick={() => toggleMonth(group.key)}
                       className="flex items-center gap-2 hover:opacity-70 transition-opacity"
@@ -300,19 +300,21 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
                         )}
                       </h3>
                     </button>
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                      {group.orders.length} order{group.orders.length !== 1 ? 's' : ''}
-                    </span>
-                    {monthPending.length > 0 && (
-                      <span className="text-xs font-semibold text-yellow-700 bg-yellow-100 border border-yellow-200 px-2 py-0.5 rounded-full">
-                        {monthPending.length} pending
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                        {group.orders.length} order{group.orders.length !== 1 ? 's' : ''}
                       </span>
-                    )}
+                      {monthPending.length > 0 && (
+                        <span className="text-xs font-semibold text-yellow-700 bg-yellow-100 border border-yellow-200 px-2 py-0.5 rounded-full">
+                          {monthPending.length} pending
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className={`flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 ${monthPending.length > 0 ? 'border-t sm:border-t-0 pt-2 sm:pt-0' : ''}`}>
                     {monthPending.length > 0 && (
-                      <div className="flex flex-col items-end gap-0.5">
+                      <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                         {monthPendingCreditUsed > 0 && (
                           <span className="text-[10px] text-muted-foreground font-medium">
                             ${monthPendingGross.toFixed(2)} - <span className="text-green-600">${monthPendingCreditUsed.toFixed(2)} credit</span>
@@ -330,7 +332,7 @@ export default function OrdersClient({ orders: initialOrders, creditBalance, loc
                     )}
                     <button
                       onClick={() => toggleMonth(group.key)}
-                      className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-muted transition-colors ml-auto sm:ml-0"
                     >
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>

@@ -794,8 +794,8 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       </div>
 
       {/* Month Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <h2 className="text-2xl font-extrabold tracking-tight">
             {format(currentMonthDate, 'MMMM yyyy')}
           </h2>
@@ -814,16 +814,16 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={autoFillMonth}
-            className="flex items-center gap-1.5 text-xs font-semibold border border-border bg-card rounded-lg px-3 py-1.5 hover:border-primary hover:text-primary transition-colors shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold border border-border bg-card rounded-lg px-3 py-1.5 hover:border-primary hover:text-primary transition-colors shadow-sm"
           >
             <Zap className="w-3.5 h-3.5" /> Random fill month
           </button>
           <button
             onClick={copyToNextMonth}
-            className="flex items-center gap-1.5 text-xs font-semibold border border-border bg-card rounded-lg px-3 py-1.5 hover:border-primary hover:text-primary transition-colors shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold border border-border bg-card rounded-lg px-3 py-1.5 hover:border-primary hover:text-primary transition-colors shadow-sm"
           >
             <Shuffle className="w-3.5 h-3.5" /> Copy to next month
           </button>
@@ -1165,29 +1165,29 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       <div className="fixed bottom-[4.5rem] md:bottom-0 left-0 right-0 z-50 pointer-events-none">
         <div className="container max-w-5xl mx-auto px-4 pb-4 pointer-events-none">
           <div className={`bg-foreground text-background rounded-2xl shadow-2xl overflow-hidden pointer-events-auto transition-all duration-300 ${totalItems === 0 ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary p-2 rounded-xl">
-                  <ShoppingCart className="w-5 h-5 text-primary-foreground" />
+            <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 gap-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-primary p-1.5 sm:p-2 rounded-xl shrink-0">
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
                 </div>
-                <div>
-                  <p className="font-bold text-lg">{totalDays} day{totalDays !== 1 ? 's' : ''} selected</p>
-                  <p className="text-sm opacity-70">{totalItems} total item{totalItems !== 1 ? 's' : ''}</p>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm sm:text-lg leading-tight truncate">{totalDays} day{totalDays !== 1 ? 's' : ''}</p>
+                  <p className="text-[10px] sm:text-sm opacity-70 leading-tight truncate">{totalItems} item{totalItems !== 1 ? 's' : ''}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                 <button
                   onClick={() => setCart({})}
-                  className="text-sm font-semibold flex items-center gap-1.5 opacity-70 hover:opacity-100 hover:text-red-400 transition-colors"
+                  className="text-xs sm:text-sm font-semibold flex items-center gap-1 opacity-70 hover:opacity-100 hover:text-red-400 transition-colors"
                 >
-                  <Trash2 className="w-4 h-4 hidden sm:block" /> Clear
+                  <Trash2 className="w-3.5 h-3.5" /> Clear
                 </button>
-                <div className="w-px h-6 bg-background/20 hidden sm:block"></div>
-                <p className="text-xl font-extrabold">${totalPrice.toFixed(2)}</p>
+                <div className="w-px h-5 bg-background/20 hidden sm:block"></div>
+                <p className="text-base sm:text-xl font-extrabold">${totalPrice.toFixed(2)}</p>
                 <button
                   onClick={handleCheckout}
                   disabled={isCheckingOut}
-                  className="bg-primary text-primary-foreground font-bold px-6 py-2.5 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60 shadow-lg"
+                  className="bg-primary text-primary-foreground font-bold px-3 py-2 sm:px-6 sm:py-2.5 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60 shadow-lg text-xs sm:text-base whitespace-nowrap"
                 >
                   {isCheckingOut ? 'Redirecting...' : 'Add to Cart →'}
                 </button>
