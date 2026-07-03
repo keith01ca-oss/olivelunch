@@ -832,7 +832,12 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   
                   // Calculate total items (sum of quantities) for the school manifest header
                   const totalItemsForSchool = schoolOrders.reduce((sum, o) => {
-                    return sum + o.order_items.reduce((itemSum: number, item: any) => itemSum + item.quantity, 0);
+                    return sum + o.order_items.reduce((itemSum: number, item: any) => {
+                      const dish = initialDishes.find(d => d.id === item.dish_id);
+                      const comps = dish?.label_components;
+                      const multiplier = comps && comps.length > 0 ? comps.length : 1;
+                      return itemSum + item.quantity * multiplier;
+                    }, 0);
                   }, 0);
 
                   return (
@@ -873,16 +878,38 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                            const divOrders = schoolOrders.filter(o => o.children?.division === div);
                            const color = divisionColors[`${schoolName}::${div}`] || { bg: '#f9f9f9', border: '#ccc' };
                            
-                           // Aggregate items, separating large and regular versions
-                           // key format: "dishId:isLarge"
-                           const divTotals: Record<string, { qty: number; dishId: string; isLarge: boolean }> = {};
+                           // Aggregate items, separating large and regular versions, and splitting by label components
+                           const divTotals: Record<string, { qty: number; dishId: string; isLarge: boolean; componentName?: string; componentIndex?: number; componentTotal?: number }> = {};
                            divOrders.forEach(o => {
                              o.order_items.forEach((item: any) => {
-                               const key = `${item.dish_id}:${!!item.is_large}`;
-                               if (!divTotals[key]) {
-                                 divTotals[key] = { qty: 0, dishId: item.dish_id, isLarge: !!item.is_large };
+                               const dish = initialDishes.find(d => d.id === item.dish_id);
+                               const comps = dish?.label_components;
+                               if (comps && comps.length > 0) {
+                                 comps.forEach((compName, idx) => {
+                                   const key = `${item.dish_id}:${!!item.is_large}:${idx}`;
+                                   if (!divTotals[key]) {
+                                     divTotals[key] = { 
+                                       qty: 0, 
+                                       dishId: item.dish_id, 
+                                       isLarge: !!item.is_large,
+                                       componentName: compName,
+                                       componentIndex: idx + 1,
+                                       componentTotal: comps.length
+                                     };
+                                   }
+                                   divTotals[key].qty += item.quantity;
+                                 });
+                               } else {
+                                 const key = `${item.dish_id}:${!!item.is_large}:none`;
+                                 if (!divTotals[key]) {
+                                   divTotals[key] = { 
+                                     qty: 0, 
+                                     dishId: item.dish_id, 
+                                     isLarge: !!item.is_large 
+                                   };
+                                 }
+                                 divTotals[key].qty += item.quantity;
                                }
-                               divTotals[key].qty += item.quantity;
                              });
                            });
 
@@ -910,7 +937,13 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                      {Object.entries(divTotals).map(([key, data]) => {
                                        const dish = initialDishes.find(d => d.id === data.dishId);
                                        const isItemLarge = data.isLarge && !!dish?.has_large;
-                                       const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                                       let displayName = '';
+                                       if (data.componentName) {
+                                         const suffix = data.componentTotal! > 1 ? ` [${data.componentIndex}/${data.componentTotal}]` : '';
+                                         displayName = data.componentName + suffix;
+                                       } else {
+                                         displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                                       }
                                        return (
                                          <tr key={key}>
                                            <td className="py-2 print:py-1 font-semibold">
@@ -939,29 +972,51 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                                        ))}
                                     </div>
 
-                                    {/* Print checklist (individual items with checkboxes) */}
-                                    <div className="hidden print:flex flex-col gap-0.5 text-[8.5px] leading-tight text-slate-700">
+                                                  <div className="hidden print:flex flex-col gap-0.5 text-[8.5px] leading-tight text-slate-700">
                                        {(() => {
                                          let itemIdx = 0;
                                          return divOrders.flatMap(o => 
                                            o.order_items.flatMap((item: any) => {
                                              const dish = initialDishes.find(d => d.id === item.dish_id);
                                              const isItemLarge = !!item.is_large && !!dish?.has_large;
-                                             const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                                             const comps = dish?.label_components;
                                              const itemsList = [];
-                                             for (let i = 0; i < item.quantity; i++) {
-                                               itemIdx++;
-                                               itemsList.push(
-                                                 <div key={`${o.id}-${item.dish_id}-${i}`} className="flex items-center gap-1 border-b border-dotted border-slate-200 pb-0.5">
-                                                   <span className="inline-block w-3.5 text-center font-bold text-slate-400">{itemIdx}</span>
-                                                   <span className="inline-block w-3 h-3 border border-slate-400 rounded-sm flex-shrink-0 mr-1" />
-                                                   <span className="capitalize font-bold truncate max-w-[85px]">{o.children?.name}</span>
-                                                   <span className="text-slate-500 truncate flex-1">
-                                                     — {displayName}
-                                                     {isItemLarge && <span className="text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
-                                                   </span>
-                                                 </div>
-                                               );
+                                             
+                                             if (comps && comps.length > 0) {
+                                               for (let i = 0; i < item.quantity; i++) {
+                                                 comps.forEach((compName, cIdx) => {
+                                                   itemIdx++;
+                                                   const suffix = comps.length > 1 ? ` [${cIdx + 1}/${comps.length}]` : '';
+                                                   const displayName = compName + suffix;
+                                                   itemsList.push(
+                                                     <div key={`${o.id}-${item.dish_id}-${i}-${cIdx}`} className="flex items-center gap-1 border-b border-dotted border-slate-200 pb-0.5">
+                                                       <span className="inline-block w-3.5 text-center font-bold text-slate-400">{itemIdx}</span>
+                                                       <span className="inline-block w-3 h-3 border border-slate-400 rounded-sm flex-shrink-0 mr-1" />
+                                                       <span className="capitalize font-bold truncate max-w-[85px]">{o.children?.name}</span>
+                                                       <span className="text-slate-500 truncate flex-1">
+                                                         — {displayName}
+                                                         {isItemLarge && <span className="text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
+                                                       </span>
+                                                     </div>
+                                                   );
+                                                 });
+                                               }
+                                             } else {
+                                               const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                                               for (let i = 0; i < item.quantity; i++) {
+                                                 itemIdx++;
+                                                 itemsList.push(
+                                                   <div key={`${o.id}-${item.dish_id}-${i}`} className="flex items-center gap-1 border-b border-dotted border-slate-200 pb-0.5">
+                                                     <span className="inline-block w-3.5 text-center font-bold text-slate-400">{itemIdx}</span>
+                                                     <span className="inline-block w-3 h-3 border border-slate-400 rounded-sm flex-shrink-0 mr-1" />
+                                                     <span className="capitalize font-bold truncate max-w-[85px]">{o.children?.name}</span>
+                                                     <span className="text-slate-500 truncate flex-1">
+                                                       — {displayName}
+                                                       {isItemLarge && <span className="text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
+                                                     </span>
+                                                   </div>
+                                                 );
+                                               }
                                              }
                                              return itemsList;
                                            })

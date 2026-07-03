@@ -8,11 +8,10 @@ export const revalidate = 0;
 export default async function KitchenPrepPage({ searchParams }: { searchParams: { date?: string, tab?: string } }) {
   const orgId = await getOrResolveOrgId();
 
-  // Fetch active dishes for mapping
+  // Fetch dishes for mapping
   const { data: dishes } = await supabaseAdmin
     .from('dishes')
     .select('id, name, category, recipe_url, ingredients, prep_time_minutes, cook_time_minutes, pack_time_seconds, has_large, large_name, label_components')
-    .eq('is_active', true)
     .is('deleted_at', null)
     .eq('org_id', orgId);
 
