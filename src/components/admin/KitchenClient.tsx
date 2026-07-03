@@ -23,6 +23,7 @@ interface Dish {
   large_name?: string;
   large_price_regular?: number;
   large_price_vip?: number;
+  label_components?: string[] | null;
 }
 
 interface OrderItem {
@@ -173,7 +174,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
   const getLabelSortVal = (label: any, field: SortField): string => {
     if (!field) return '';
     const dish = initialDishes.find(d => d.id === label.dishId);
-    if (field === 'dish') return dish?.name || '';
+    if (field === 'dish') return label.componentName || dish?.name || '';
     if (field === 'school') return (label.child?.schools as any)?.name || '';
     if (field === 'division') return label.child?.division || '';
     if (field === 'childName') return label.child?.name || '';
@@ -185,15 +186,36 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
     const list: any[] = [];
     orders.forEach(order => {
       order.order_items.forEach((item: any) => {
+        const dish = initialDishes.find(d => d.id === item.dish_id);
+        const components = dish?.label_components && dish.label_components.length > 0
+          ? dish.label_components
+          : null;
+
         for (let q = 0; q < item.quantity; q++) {
-          list.push({
-            orderId: order.id,
-            child: order.children,
-            dishId: item.dish_id,
-            is_large: item.is_large,
-            itemNumber: q + 1,
-            totalQuantity: item.quantity
-          });
+          if (components) {
+            components.forEach((compName, compIdx) => {
+              list.push({
+                orderId: order.id,
+                child: order.children,
+                dishId: item.dish_id,
+                is_large: item.is_large,
+                itemNumber: q + 1,
+                totalQuantity: item.quantity,
+                componentName: compName,
+                componentIndex: compIdx + 1,
+                componentTotal: components.length
+              });
+            });
+          } else {
+            list.push({
+              orderId: order.id,
+              child: order.children,
+              dishId: item.dish_id,
+              is_large: item.is_large,
+              itemNumber: q + 1,
+              totalQuantity: item.quantity
+            });
+          }
         }
       });
     });
@@ -703,7 +725,9 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   const color = divisionColors[divKey] || { bg: '#f9f9f9', border: '#aaa' };
                   const dish = initialDishes.find(d => d.id === labelInfo.dishId);
                   const isItemLarge = !!labelInfo.is_large && !!dish?.has_large;
-                  const displayName = isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || '');
+                  const displayName = labelInfo.componentName 
+                    ? labelInfo.componentName 
+                    : (isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || ''));
                   const printDate = selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                   // Sequential unique icon per school (guaranteed no collisions)
                   // ECS EC is always 'cross'; all other schools get sequential pictographic icons
@@ -753,6 +777,11 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                       <div className="label-row2 flex items-center justify-between font-bold text-[11px] overflow-hidden pl-3 mt-0.5">
                         <span className="truncate flex-1">
                           {displayName}
+                          {labelInfo.componentTotal > 1 && (
+                            <span className="text-gray-500 font-bold ml-1 text-[9px]">
+                              [{labelInfo.componentIndex}/{labelInfo.componentTotal}]
+                            </span>
+                          )}
                           {isItemLarge && <span className="large-indicator text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
                           {' '}
                           {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-muted-foreground ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}

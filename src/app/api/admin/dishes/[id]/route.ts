@@ -7,7 +7,7 @@ type Context = { params: { id: string } };
 export async function PUT(req: NextRequest, { params }: Context) {
   try {
     const body = await req.json();
-    const { name, category, price_regular, price_vip, is_active, sort_order, recipe_url, ingredients, instructions, overhead_costs, prep_time_minutes, cook_time_minutes, pack_time_seconds, has_large, large_name, large_price_regular, large_price_vip } = body;
+    const { name, category, price_regular, price_vip, is_active, sort_order, recipe_url, ingredients, instructions, overhead_costs, prep_time_minutes, cook_time_minutes, pack_time_seconds, has_large, large_name, large_price_regular, large_price_vip, label_components } = body;
 
     const { data: dish, error } = await supabaseAdmin
       .from('dishes')
@@ -28,7 +28,8 @@ export async function PUT(req: NextRequest, { params }: Context) {
         has_large: has_large ?? false,
         large_name: large_name || null,
         large_price_regular: large_price_regular || null,
-        large_price_vip: large_price_vip || null
+        large_price_vip: large_price_vip || null,
+        label_components: label_components || null
       })
       .eq('id', params.id)
       .select()

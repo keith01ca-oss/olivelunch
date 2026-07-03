@@ -16,6 +16,7 @@ interface Dish {
   large_name?: string;
   large_price_regular?: number;
   large_price_vip?: number;
+  label_components?: string[] | null;
 }
 
 interface Props {

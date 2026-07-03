@@ -70,6 +70,7 @@ CREATE TABLE dishes (
     is_active BOOLEAN DEFAULT TRUE,
     recipe_url VARCHAR,
     ingredients JSONB DEFAULT '[]'::jsonb,
+    label_components TEXT[] DEFAULT NULL,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

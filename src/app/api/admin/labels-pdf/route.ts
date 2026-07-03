@@ -89,17 +89,18 @@ export async function GET(req: NextRequest) {
   // Fetch dishes
   const { data: dishes } = await supabaseAdmin
     .from('dishes')
-    .select('id, name, has_large, large_name')
+    .select('id, name, has_large, large_name, label_components')
     .eq('is_active', true)
     .is('deleted_at', null)
     .eq('org_id', orgId);
 
-  const dishMap: Record<string, { name: string; has_large: boolean; large_name: string | null }> = {};
+  const dishMap: Record<string, { name: string; has_large: boolean; large_name: string | null; label_components: string[] | null }> = {};
   (dishes || []).forEach((d: any) => {
     dishMap[d.id] = {
       name: d.name,
       has_large: !!d.has_large,
-      large_name: d.large_name
+      large_name: d.large_name,
+      label_components: d.label_components
     };
   });
 
@@ -158,7 +159,7 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  // Flatten: 1 label per item per quantity
+  // Flatten: 1 label per item per quantity (or components)
   const labels: any[] = [];
   orders.forEach((order: any) => {
     const schoolName = (order.children?.schools as any)?.name || '';
@@ -167,25 +168,51 @@ export async function GET(req: NextRequest) {
     order.order_items.forEach((item: any) => {
       const dishInfo = dishMap[item.dish_id];
       const isLarge = !!item.is_large && !!dishInfo?.has_large;
-      const finalDishName = isLarge && dishInfo?.large_name ? dishInfo.large_name : (dishInfo?.name || '');
+      const components = dishInfo?.label_components && dishInfo.label_components.length > 0
+        ? dishInfo.label_components
+        : null;
 
       for (let q = 0; q < item.quantity; q++) {
-        labels.push({
-          childName: order.children?.name || '',
-          division,
-          divKey,
-          deliveryLocation: order.children?.delivery_location || '',
-          lunchTime: order.children?.lunch_time || '',
-          schoolName,
-          schoolIcon: schoolIconMap[schoolName] || 'heart',
-          stopOrder: (order.children?.schools as any)?.school_routes?.[0]?.stop_order || 0,
-          routeNumber: (order.children?.schools as any)?.school_routes?.[0]?.routes?.route_number || '',
-          dishName: finalDishName,
-          itemNum: q + 1,
-          totalQty: item.quantity,
-          color: divColorMap[divKey] || '#888888',
-          isLarge,
-        });
+        if (components) {
+          components.forEach((compName, compIdx) => {
+            labels.push({
+              childName: order.children?.name || '',
+              division,
+              divKey,
+              deliveryLocation: order.children?.delivery_location || '',
+              lunchTime: order.children?.lunch_time || '',
+              schoolName,
+              schoolIcon: schoolIconMap[schoolName] || 'heart',
+              stopOrder: (order.children?.schools as any)?.school_routes?.[0]?.stop_order || 0,
+              routeNumber: (order.children?.schools as any)?.school_routes?.[0]?.routes?.route_number || '',
+              dishName: compName,
+              itemNum: q + 1,
+              totalQty: item.quantity,
+              color: divColorMap[divKey] || '#888888',
+              isLarge,
+              componentIndex: compIdx + 1,
+              componentTotal: components.length
+            });
+          });
+        } else {
+          const finalDishName = isLarge && dishInfo?.large_name ? dishInfo.large_name : (dishInfo?.name || '');
+          labels.push({
+            childName: order.children?.name || '',
+            division,
+            divKey,
+            deliveryLocation: order.children?.delivery_location || '',
+            lunchTime: order.children?.lunch_time || '',
+            schoolName,
+            schoolIcon: schoolIconMap[schoolName] || 'heart',
+            stopOrder: (order.children?.schools as any)?.school_routes?.[0]?.stop_order || 0,
+            routeNumber: (order.children?.schools as any)?.school_routes?.[0]?.routes?.route_number || '',
+            dishName: finalDishName,
+            itemNum: q + 1,
+            totalQty: item.quantity,
+            color: divColorMap[divKey] || '#888888',
+            isLarge,
+          });
+        }
       }
     });
   });
@@ -283,9 +310,13 @@ export async function GET(req: NextRequest) {
       .restore();
 
     // ROW 2: Dish Name + Time
+    let finalDishName = label.dishName;
+    if (label.componentTotal > 1) {
+      finalDishName += ` [${label.componentIndex}/${label.componentTotal}]`;
+    }
     const dishText = label.totalQty > 1
-      ? `${label.dishName}  (${label.itemNum}/${label.totalQty})`
-      : label.dishName;
+      ? `${finalDishName}  (${label.itemNum}/${label.totalQty})`
+      : finalDishName;
 
     const lunchTime = formatTimeWithAmPm(label.lunchTime);
 

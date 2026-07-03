@@ -210,6 +210,7 @@ export interface Database {
           large_name: string | null
           large_price_regular: number | null
           large_price_vip: number | null
+          label_components: string[] | null
           deleted_at: string | null
           created_at: string
           updated_at: string
@@ -234,6 +235,7 @@ export interface Database {
           large_name?: string | null
           large_price_regular?: number | null
           large_price_vip?: number | null
+          label_components?: string[] | null
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
@@ -258,6 +260,7 @@ export interface Database {
           large_name?: string | null
           large_price_regular?: number | null
           large_price_vip?: number | null
+          label_components?: string[] | null
           deleted_at?: string | null
           created_at?: string
           updated_at?: string

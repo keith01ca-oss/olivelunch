@@ -36,6 +36,7 @@ interface Dish {
   large_name?: string;
   large_price_regular?: number;
   large_price_vip?: number;
+  label_components?: string[] | null;
 }
 
 const DEFAULT_CATEGORIES = ['main', 'side', 'snack', 'drink'];
@@ -58,7 +59,8 @@ const emptyForm = {
   has_large: false,
   large_name: '',
   large_price_regular: '',
-  large_price_vip: ''
+  large_price_vip: '',
+  label_components: ''
 };
 
 export default function DishesClient({ initialDishes, orgSettings }: { initialDishes: Dish[], orgSettings?: any }) {
@@ -104,7 +106,8 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
       has_large: d.has_large || false,
       large_name: d.large_name || '',
       large_price_regular: d.large_price_regular ? String(d.large_price_regular) : '',
-      large_price_vip: d.large_price_vip ? String(d.large_price_vip) : ''
+      large_price_vip: d.large_price_vip ? String(d.large_price_vip) : '',
+      label_components: d.label_components ? d.label_components.join(', ') : ''
     }); 
     setShowForm(true); 
   };
@@ -141,6 +144,9 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
     // Clean arrays
     const cleanIngredients = form.ingredients.filter(i => i.name.trim() !== '').map(i => ({...i, amount: Number(i.amount) || 0, cost_per_unit: Number(i.cost_per_unit) || 0}));
     const cleanOverheads = form.overhead_costs.filter(o => o.name.trim() !== '').map(o => ({...o, amount: Number(o.amount) || 0}));
+    const cleanLabelComponents = form.label_components.trim()
+      ? form.label_components.split(',').map(s => s.trim()).filter(Boolean)
+      : null;
 
     setSaving(true);
     try {
@@ -162,6 +168,7 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
         large_name: form.has_large ? form.large_name.trim() : null,
         large_price_regular: form.has_large && form.large_price_regular ? parseFloat(form.large_price_regular as string) : null,
         large_price_vip: form.has_large && form.large_price_vip ? parseFloat(form.large_price_vip as string) : null,
+        label_components: cleanLabelComponents,
       };
       const method = editing ? 'PUT' : 'POST';
       const url = editing ? `/api/admin/dishes/${editing.id}` : '/api/admin/dishes';
@@ -296,6 +303,14 @@ export default function DishesClient({ initialDishes, orgSettings }: { initialDi
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-1.5 pt-2">
+                  <label className="text-sm font-medium">Label Components (Optional)</label>
+                  <input value={form.label_components} onChange={e => setForm(f => ({...f, label_components: e.target.value}))}
+                    className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none"
+                    placeholder="e.g. Hotdog, Apple Juice" />
+                  <p className="text-[10px] text-muted-foreground font-medium text-slate-500">If entered, the kitchen will print separate labels for each component listed (comma-separated). Leave blank to print a single label with the dish name.</p>
+                </div>
               </section>
 
               <section className="space-y-4">
