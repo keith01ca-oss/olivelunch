@@ -1,14 +1,16 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
-import { Home, Calendar, ShoppingBag, Settings, ShieldCheck } from 'lucide-react';
+import { Home, Calendar, ShoppingBag, Settings, ShieldCheck, ShoppingCart } from 'lucide-react';
 
 const navItems = [
   { name: 'Home', href: '/dashboard', icon: Home },
   { name: 'Menu', href: '/menu', icon: Calendar },
   { name: 'My Orders', href: '/orders', icon: ShoppingBag },
+  { name: 'Cart', href: '/cart', icon: ShoppingCart },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -16,6 +18,41 @@ const adminNavItem = { name: 'Admin', href: '/admin', icon: ShieldCheck };
 
 export function ParentNavbar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const [cartCount, setCartCount] = useState(0);
+
+  useEffect(() => {
+    const updateCartCount = () => {
+      let count = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('olive_cart_')) {
+            const saved = localStorage.getItem(key);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              Object.values(parsed).forEach((dayCart: any) => {
+                Object.values(dayCart).forEach((qty: any) => {
+                  count += Number(qty) || 0;
+                });
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      setCartCount(count);
+    };
+
+    updateCartCount();
+    window.addEventListener('cart-updated', updateCartCount);
+    window.addEventListener('storage', updateCartCount);
+
+    return () => {
+      window.removeEventListener('cart-updated', updateCartCount);
+      window.removeEventListener('storage', updateCartCount);
+    };
+  }, []);
 
   return (
     <>
@@ -30,15 +67,22 @@ export function ParentNavbar({ isAdmin = false }: { isAdmin?: boolean }) {
           <nav className="hidden md:flex items-center gap-6">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                  className={`relative text-sm font-medium transition-colors hover:text-primary flex items-center gap-1 ${
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   }`}
                 >
+                  <Icon className="w-4 h-4" />
                   {item.name}
+                  {item.name === 'Cart' && cartCount > 0 && (
+                    <span className="absolute -top-2.5 -right-3 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm ring-2 ring-background animate-pulse">
+                      {cartCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -75,12 +119,17 @@ export function ParentNavbar({ isAdmin = false }: { isAdmin?: boolean }) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
+                className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
                 <Icon className={`h-5 w-5 ${isActive ? 'fill-primary/20' : ''}`} />
                 <span className="text-[10px] font-medium">{item.name}</span>
+                {item.name === 'Cart' && cartCount > 0 && (
+                  <span className="absolute top-1 right-[25%] flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm ring-2 ring-background">
+                    {cartCount}
+                  </span>
+                )}
               </Link>
             );
           })}

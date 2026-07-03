@@ -124,6 +124,7 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
   useEffect(() => {
     if (!isLoaded || !selectedChildId) return;
     localStorage.setItem(`olive_cart_${selectedChildId}`, JSON.stringify(cart));
+    window.dispatchEvent(new Event('cart-updated'));
   }, [cart, isLoaded, selectedChildId]);
 
   // Accordion-aware toggle: expanding a day collapses empty siblings in the same week
@@ -685,6 +686,21 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
               </div>
             )}
 
+            {/* In Cart Details */}
+            {isSelected && Object.keys(dayCart).length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 p-2 rounded-lg text-xs">
+                <p className="font-bold mb-1 flex items-center gap-1">🛒 In Cart:</p>
+                <ul className="list-disc pl-4 space-y-0.5 font-medium">
+                  {Object.entries(dayCart).map(([dishId, qty]) => {
+                    const dish = dishes.find(d => d.id === dishId);
+                    const isDishLarge = sizeMode === 'large' && dish?.has_large;
+                    const displayName = isDishLarge && dish?.large_name ? dish.large_name : dish?.name;
+                    return <li key={dishId}>{qty}x {displayName}</li>;
+                  })}
+                </ul>
+              </div>
+            )}
+
             {/* All Dishes (Uncategorized) */}
             {!blockReason && (() => {
               // Combine all categories into one flat list
@@ -1186,11 +1202,10 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                 <div className="w-px h-5 bg-background/20 hidden sm:block"></div>
                 <p className="text-base sm:text-xl font-extrabold">${totalPrice.toFixed(2)}</p>
                 <button
-                  onClick={handleCheckout}
-                  disabled={isCheckingOut}
-                  className="bg-primary text-primary-foreground font-bold px-3 py-2 sm:px-6 sm:py-2.5 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60 shadow-lg text-xs sm:text-base whitespace-nowrap"
+                  onClick={() => router.push('/cart')}
+                  className="bg-primary text-primary-foreground font-bold px-3 py-2 sm:px-6 sm:py-2.5 rounded-xl hover:bg-primary/90 transition-colors shadow-lg text-xs sm:text-base whitespace-nowrap"
                 >
-                  {isCheckingOut ? 'Redirecting...' : 'Add to Cart →'}
+                  Review Cart & Checkout →
                 </button>
               </div>
             </div>
