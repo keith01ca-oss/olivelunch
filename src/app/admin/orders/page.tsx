@@ -55,6 +55,7 @@ export default async function AdminOrdersPage({
 
   if (dateFilter) query = query.eq('order_date', dateFilter);
   if (statusFilter) query = query.eq('status', statusFilter);
+  query = query.eq('org_id', orgId);
 
   const [
     { data: orders, error },

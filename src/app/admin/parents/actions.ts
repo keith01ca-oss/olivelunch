@@ -2,8 +2,10 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { verifyAdmin } from '@/lib/auth';
 
 export async function addManualCredit(parentId: string, amount: number, note: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!parentId || !amount || amount === 0) return { error: 'Parent and amount are required' };
 
   const { error } = await supabaseAdmin.from('credits').insert({
@@ -23,6 +25,7 @@ export async function addManualCredit(parentId: string, amount: number, note: st
 }
 
 export async function toggleVipStatus(parentId: string, isVip: boolean) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('parents')
     .update({ is_vip: isVip })
@@ -42,6 +45,7 @@ export async function broadcastEmail(
   subject: string,
   htmlBody: string,
 ) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!subject.trim() || !htmlBody.trim()) return { error: 'Subject and message are required' };
 
   const { Resend } = await import('resend');

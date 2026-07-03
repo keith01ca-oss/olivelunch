@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getOrResolveOrgId } from '@/lib/auth';
+import { getOrResolveOrgId, verifyAdminRoute } from '@/lib/auth';
 
 type Context = { params: { id: string } };
 
 // DELETE /api/admin/menus/[id]
 export async function DELETE(req: NextRequest, { params }: Context) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   try {
     const orgId = await getOrResolveOrgId();
     if (!orgId) return NextResponse.json({ error: 'Organization context missing' }, { status: 400 });

@@ -167,6 +167,11 @@ export async function POST(req: NextRequest) {
          return NextResponse.json({ error: `Cutoff passed for order date ${orderDateStr}` }, { status: 400 });
       }
 
+      // 5. Validate max advance window (60 days)
+      if (orderDateStr > maxOrderDateStr) {
+         return NextResponse.json({ error: `Orders cannot be placed more than ${MAX_ADVANCE_DAYS} days in advance.` }, { status: 400 });
+      }
+
       let orderGross = 0;
 
       for (const item of order.items) {
@@ -308,7 +313,7 @@ export async function POST(req: NextRequest) {
     // 2. IS THIS A NORMAL PAID ORDER?
     // Create Stripe Checkout Session FIRST to get the ID
     const session = await stripe.checkout.sessions.create({
-      ui_mode: 'embedded',
+      ui_mode: 'embedded' as any,
       payment_method_types: ['card'],
       line_items: [
         {

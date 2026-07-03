@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getOrResolveOrgId } from '@/lib/auth';
+import { getOrResolveOrgId, verifyAdminRoute } from '@/lib/auth';
 
 // GET /api/admin/kitchen?date=YYYY-MM-DD
 export async function GET(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
   const orgId = await getOrResolveOrgId();

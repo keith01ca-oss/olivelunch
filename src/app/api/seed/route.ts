@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getOrResolveOrgId } from '@/lib/auth';
+import { getOrResolveOrgId, verifyAdminRoute } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   const force = new URL(req.url).searchParams.get('force') === '1';
 
   try {

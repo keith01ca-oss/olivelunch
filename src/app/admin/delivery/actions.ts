@@ -2,10 +2,12 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { verifyAdmin } from '@/lib/auth';
 
 // -- ROUTES --
 
 export async function createRoute(orgId: string, routeNumber: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!orgId) return { error: 'Organization ID is required' };
   if (!routeNumber.trim()) return { error: 'Route number is required' };
   
@@ -25,6 +27,7 @@ export async function createRoute(orgId: string, routeNumber: string) {
 }
 
 export async function deleteRoute(id: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('routes')
     .delete()
@@ -42,6 +45,7 @@ export async function deleteRoute(id: string) {
 // -- SCHOOLS --
 
 export async function createSchool(orgId: string, name: string, routeId?: string, stopOrder: number = 0) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!orgId) return { error: 'Organization ID is required' };
   if (!name.trim()) return { error: 'School name is required' };
   
@@ -71,6 +75,7 @@ export async function createSchool(orgId: string, name: string, routeId?: string
 }
 
 export async function deleteSchool(id: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('schools')
     .delete()
@@ -86,6 +91,7 @@ export async function deleteSchool(id: string) {
 }
 
 export async function updateSchoolRoute(schoolId: string, newRouteId: string, stopOrder: number = 0) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   // First, delete existing mapping
   await supabaseAdmin
     .from('school_routes')
@@ -109,6 +115,7 @@ export async function updateSchoolRoute(schoolId: string, newRouteId: string, st
 }
 
 export async function updateSchoolActive(id: string, isActive: boolean) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('schools')
     .update({ is_active: isActive })

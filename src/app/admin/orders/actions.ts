@@ -2,8 +2,10 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { verifyAdmin } from '@/lib/auth';
 
 export async function updateOrderStatuses(ids: string[], newStatus: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!ids || ids.length === 0) return { error: 'No orders selected' };
 
   const { error } = await supabaseAdmin
@@ -21,6 +23,7 @@ export async function updateOrderStatuses(ids: string[], newStatus: string) {
 }
 
 export async function deleteOrdersAdmin(ids: string[]) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!ids || ids.length === 0) return { error: 'No orders selected' };
 
   const { error } = await supabaseAdmin
@@ -38,6 +41,7 @@ export async function deleteOrdersAdmin(ids: string[]) {
 }
 
 export async function removeOrderItemAndIssueCredit(orderId: string, orderItemId: string, quantityToRemove: number) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   try {
     // 1. Fetch the specific order item
     const { data: orderItem, error: itemError } = await supabaseAdmin
@@ -112,6 +116,7 @@ export async function createOrderAdmin(data: {
   total_amount: number;
   org_id: string;
 }) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   try {
     if (!data.items || data.items.length === 0) {
       throw new Error('Order must contain at least one item');
@@ -170,6 +175,7 @@ export async function addItemToOrderAdmin(orderId: string, item: {
   total_price: number;
   is_large: boolean;
 }) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   try {
     // 1. Fetch the order to get current totals
     const { data: order, error: orderError } = await supabaseAdmin

@@ -55,9 +55,12 @@ function getSchoolShapeIdx(schoolName: string): number {
 
 export const dynamic = 'force-dynamic';
 
-import { getOrResolveOrgId } from '@/lib/auth';
+import { getOrResolveOrgId, verifyAdminRoute } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
   const orgId = await getOrResolveOrgId();

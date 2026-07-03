@@ -179,3 +179,37 @@ export async function requireKitchen() {
   }
   return context;
 }
+
+/**
+ * Verifies the caller is a super-admin (in ADMIN_CLERK_USER_IDS env var).
+ * Use this in server actions and API routes that require admin access.
+ * Throws an Error on failure (compatible with server actions that return { error } and API routes).
+ */
+export async function verifyAdmin(): Promise<void> {
+  const authContext = await getResolvedParent();
+  if ('error' in authContext) {
+    throw new Error('Unauthorized');
+  }
+  const allowedIds = (process.env.ADMIN_CLERK_USER_IDS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const isSuperAdmin = allowedIds.length > 0 && allowedIds.includes(authContext.clerkUserId);
+  if (!isSuperAdmin) {
+    throw new Error('Forbidden');
+  }
+}
+
+/**
+ * Same as verifyAdmin() but returns { error, status } instead of throwing.
+ * Use this at the top of Next.js API route handlers.
+ */
+export async function verifyAdminRoute(): Promise<{ error: string; status: number } | null> {
+  try {
+    await verifyAdmin();
+    return null;
+  } catch (err: any) {
+    const status = err.message === 'Unauthorized' ? 401 : 403;
+    return { error: err.message, status };
+  }
+}

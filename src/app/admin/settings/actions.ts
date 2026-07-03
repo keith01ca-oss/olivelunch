@@ -1,20 +1,8 @@
 'use server';
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { getResolvedParent } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-
-async function verifyAdmin() {
-  const authContext = await getResolvedParent();
-  if ('error' in authContext) throw new Error('Unauthorized');
-  
-  const allowedIds = (process.env.ADMIN_CLERK_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
-  const isSuperAdmin = allowedIds.length > 0 && allowedIds.includes(authContext.clerkUserId);
-  if (!isSuperAdmin) {
-    throw new Error('Forbidden');
-  }
-  return authContext;
-}
+import { verifyAdmin } from '@/lib/auth';
 
 export async function saveDashboardMessages(orgId: string, messages: { info: string; warning: string }) {
   await verifyAdmin();

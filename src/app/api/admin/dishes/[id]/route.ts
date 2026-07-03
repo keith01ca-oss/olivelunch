@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { verifyAdminRoute } from '@/lib/auth';
 
 type Context = { params: { id: string } };
 
 // PUT /api/admin/dishes/[id] - Update a dish
 export async function PUT(req: NextRequest, { params }: Context) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   try {
     const body = await req.json();
     const { name, category, price_regular, price_vip, is_active, sort_order, recipe_url, ingredients, instructions, overhead_costs, prep_time_minutes, cook_time_minutes, pack_time_seconds, has_large, large_name, large_price_regular, large_price_vip, label_components } = body;
@@ -44,6 +48,9 @@ export async function PUT(req: NextRequest, { params }: Context) {
 
 // DELETE /api/admin/dishes/[id] - Soft delete a dish
 export async function DELETE(_req: NextRequest, { params }: Context) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   try {
     const { error } = await supabaseAdmin
       .from('dishes')

@@ -30,6 +30,11 @@ function calculateProrationCredit(joinDate: Date): number {
 }
 
 export async function POST(req: NextRequest) {
+  if (!webhookSecret) {
+    console.error('STRIPE_WEBHOOK_SECRET is not configured');
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+  }
+
   try {
     const rawBody = await req.text();
     const signature = req.headers.get('stripe-signature');

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parseISO, endOfMonth, format } from 'date-fns';
-import { getOrResolveOrgId } from '@/lib/auth';
+import { getOrResolveOrgId, verifyAdminRoute } from '@/lib/auth';
 
 // GET /api/admin/menus?month=YYYY-MM
 export async function GET(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month'); // e.g. 2024-10
   const orgId = await getOrResolveOrgId();
@@ -36,6 +39,9 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/menus
 // Body: { date: '2024-10-15', dish_id: '...' }
 export async function POST(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   try {
     const orgId = await getOrResolveOrgId();
     if (!orgId) return NextResponse.json({ error: 'Organization context missing' }, { status: 400 });
@@ -83,6 +89,9 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/admin/menus?month=YYYY-MM&dish_ids=id1,id2
 export async function DELETE(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month');
   const dishIdsParam = searchParams.get('dish_ids');

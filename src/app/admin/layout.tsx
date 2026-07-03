@@ -1,5 +1,4 @@
 import { getResolvedParent } from '@/lib/auth';
-import { supabaseAdmin } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, UtensilsCrossed, ShoppingBag, Users, Truck, CalendarX, ChefHat, Settings, BookOpen } from 'lucide-react';

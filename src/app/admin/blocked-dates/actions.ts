@@ -2,10 +2,12 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { verifyAdmin } from '@/lib/auth';
 
 // -- BLOCKED SINGLE DATES --
 
 export async function createBlockedDate(date: string, reason: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!date || !reason.trim()) return { error: 'Date and reason are required' };
 
   const { error } = await supabaseAdmin
@@ -24,6 +26,7 @@ export async function createBlockedDate(date: string, reason: string) {
 }
 
 export async function deleteBlockedDate(id: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('blocked_dates')
     .delete()
@@ -42,6 +45,7 @@ export async function deleteBlockedDate(id: string) {
 // -- PRO-D / HOLIDAY RANGES --
 
 export async function createProDRange(startDate: string, endDate: string, message: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!startDate || !endDate || !message.trim()) return { error: 'All fields are required' };
   if (startDate > endDate) return { error: 'Start date must be before end date' };
 
@@ -60,6 +64,7 @@ export async function createProDRange(startDate: string, endDate: string, messag
 }
 
 export async function deleteProDRange(id: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('pro_d_ranges')
     .delete()
@@ -78,6 +83,7 @@ export async function deleteProDRange(id: string) {
 // -- DATE WARNINGS (non-blocking notices) --
 
 export async function createDateWarning(date: string, message: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   if (!date || !message.trim()) return { error: 'Date and message are required' };
 
   const { error } = await supabaseAdmin
@@ -96,6 +102,7 @@ export async function createDateWarning(date: string, message: string) {
 }
 
 export async function deleteDateWarning(id: string) {
+  try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
   const { error } = await supabaseAdmin
     .from('date_warnings')
     .delete()

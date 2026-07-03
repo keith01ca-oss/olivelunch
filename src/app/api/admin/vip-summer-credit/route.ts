@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getOrResolveOrgId } from '@/lib/auth';
+import { verifyAdminRoute } from '@/lib/auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
 
 export async function POST(req: NextRequest) {
-  // Simple admin authorization check
+  // Allow either ADMIN_SECRET header or authenticated admin session
   const adminSecret = req.headers.get('x-admin-secret');
-  if (adminSecret !== process.env.ADMIN_SECRET) {
-    const orgId = await getOrResolveOrgId().catch(() => null);
-    if (!orgId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  if (adminSecret !== process.env.ADMIN_SECRET || !process.env.ADMIN_SECRET) {
+    // Fall back to session-based admin check
+    const authErr = await verifyAdminRoute();
+    if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
   }
 
   // Get all active VIP parents

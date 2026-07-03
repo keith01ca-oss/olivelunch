@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getOrResolveOrgId } from '@/lib/auth';
+import { getOrResolveOrgId, verifyAdminRoute } from '@/lib/auth';
 
 // POST /api/admin/dishes - Create a new dish
 export async function POST(req: NextRequest) {
+  const authErr = await verifyAdminRoute();
+  if (authErr) return NextResponse.json({ error: authErr.error }, { status: authErr.status });
+
   try {
     const orgId = await getOrResolveOrgId();
     if (!orgId) return NextResponse.json({ error: 'Organization context missing' }, { status: 400 });
