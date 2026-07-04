@@ -503,14 +503,13 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
 
       if (data.error) { alert(data.error); return; }
       if (data.client_secret) {
-        // Clear cart from localStorage BEFORE leaving (so it's gone when we return)
-        try { localStorage.removeItem(`olive_cart_${selectedChildId}`); } catch (e) {}
-        setCart({});
+        // Keep cart in localStorage while navigating to Stripe checkout so clicking back preserves items
         router.push(`/checkout?client_secret=${data.client_secret}`);
       } else if (data.success) {
         // Zero-cost order (paid via credit) — clear cart and go to dashboard
         try { localStorage.removeItem(`olive_cart_${selectedChildId}`); } catch (e) {}
         setCart({});
+        window.dispatchEvent(new Event('cart-updated'));
         router.push('/dashboard?success=true');
       }
     } catch (err) {
@@ -766,14 +765,6 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
 
         {/* View Toggle */}
         <div className="flex items-center gap-2 bg-muted rounded-lg p-1 self-start sm:self-auto">
-          <button
-            onClick={() => setViewMode('planner')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              viewMode === 'planner' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" /> Planner View
-          </button>
           <button
             onClick={() => setViewMode('desktop')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
@@ -1194,7 +1185,15 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
               </div>
               <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                 <button
-                  onClick={() => setCart({})}
+                  onClick={() => {
+                    if (confirm('Are you sure you want to clear your shopping cart?')) {
+                      childrenList.forEach(c => {
+                        try { localStorage.removeItem(`olive_cart_${c.id}`); } catch (e) {}
+                      });
+                      setCart({});
+                      window.dispatchEvent(new Event('cart-updated'));
+                    }
+                  }}
                   className="text-xs sm:text-sm font-semibold flex items-center gap-1 opacity-70 hover:opacity-100 hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Clear

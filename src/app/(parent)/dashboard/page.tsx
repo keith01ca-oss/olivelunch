@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { PlusCircle, Star } from 'lucide-react';
 import ReferralCard from '@/components/parent/ReferralCard';
+import ClearCartOnSuccess from '@/components/parent/ClearCartOnSuccess';
 
 export default async function DashboardPage({
   searchParams,
@@ -158,7 +159,9 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6">
       {searchParams?.success === 'true' && (
-        <div className="p-5 rounded-2xl border-2 bg-emerald-50 border-emerald-200 text-emerald-950 shadow-md animate-in fade-in slide-in-from-top-4 duration-300 flex items-start gap-4">
+        <>
+          <ClearCartOnSuccess />
+          <div className="p-5 rounded-2xl border-2 bg-emerald-50 border-emerald-200 text-emerald-950 shadow-md animate-in fade-in slide-in-from-top-4 duration-300 flex items-start gap-4">
           <div className="text-3xl">🥳</div>
           <div className="flex-1">
             <h4 className="font-extrabold text-lg text-emerald-900">Order Placed Successfully!</h4>
@@ -168,7 +171,8 @@ export default async function DashboardPage({
                 : 'Your order was paid 100% using your available account credit.'}
             </p>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       <header className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">

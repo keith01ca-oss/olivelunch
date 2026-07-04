@@ -104,8 +104,8 @@ function CheckoutContent() {
       <div className="max-w-md mx-auto my-12 text-center p-8 bg-card border rounded-2xl shadow-sm animate-fade-in-up">
         <h2 className="text-xl font-bold text-red-600 mb-2">Invalid Checkout Session</h2>
         <p className="text-muted-foreground mb-4">No checkout session was found. Please return to the menu and try again.</p>
-        <button onClick={() => router.push('/menu')} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors">
-          Back to Menu
+        <button onClick={() => router.push('/cart')} className="bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors">
+          Back to Cart
         </button>
       </div>
     );
@@ -119,10 +119,10 @@ function CheckoutContent() {
           <p className="text-sm text-muted-foreground">Complete your order payment securely via Stripe.</p>
         </div>
         <button
-          onClick={() => router.push('/menu')}
+          onClick={() => router.push('/cart')}
           className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
-          Cancel & Back
+          Cancel & Back to Cart
         </button>
       </div>
 

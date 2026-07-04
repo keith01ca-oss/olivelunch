@@ -24,7 +24,7 @@ export default async function ParentLayout({
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col">
       <ParentNavbar isAdmin={isAdmin} />
-      <main className="flex-1 container mx-auto px-4 py-6 md:py-8 pb-24 md:pb-8 animate-fade-in-up">
+      <main className="flex-1 container mx-auto px-4 py-6 md:py-8 pb-24 md:pb-8">
         {children}
       </main>
     </div>

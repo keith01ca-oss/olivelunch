@@ -220,17 +220,17 @@ export default function CartClient({ childrenList, dishes, isVip, totalCredit, e
         return;
       }
 
-      // Clear local storage for all active child carts
-      childrenList.forEach((child) => {
-        try {
-          localStorage.removeItem(`olive_cart_${child.id}`);
-        } catch (e) {}
-      });
-      window.dispatchEvent(new Event('cart-updated'));
-
       if (data.client_secret) {
+        // Keep cart in localStorage while navigating to Stripe checkout so clicking back preserves items
         router.push(`/checkout?client_secret=${data.client_secret}`);
       } else if (data.success) {
+        // Clear local storage when order succeeds instantly (e.g. 100% credit)
+        childrenList.forEach((child) => {
+          try {
+            localStorage.removeItem(`olive_cart_${child.id}`);
+          } catch (e) {}
+        });
+        window.dispatchEvent(new Event('cart-updated'));
         router.push('/dashboard?success=true');
       }
     } catch (err) {
