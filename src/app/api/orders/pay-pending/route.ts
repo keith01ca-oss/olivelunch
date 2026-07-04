@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedParent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { sendOrderConfirmationEmail } from '@/lib/email';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
@@ -98,6 +99,13 @@ export async function POST(req: NextRequest) {
         order_id: validOrders[0].id,
       });
     }
+
+    // Fetch parent info to send email receipt
+    const { data: parent } = await supabaseAdmin.from('parents').select('*').eq('id', parentId).single();
+    if (parent) {
+      await sendOrderConfirmationEmail(parent.email, parent.name, validOrders.map(o => o.id));
+    }
+
     return NextResponse.json({ success: true, stripe_url: null });
   }
 

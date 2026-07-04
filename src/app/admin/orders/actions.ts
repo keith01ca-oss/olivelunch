@@ -3,6 +3,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { verifyAdmin } from '@/lib/auth';
+import { sendAdminCancellationEmail } from '@/lib/email';
 
 export async function updateOrderStatuses(ids: string[], newStatus: string) {
   try { await verifyAdmin(); } catch (e: any) { return { error: e.message }; }
@@ -46,17 +47,17 @@ export async function removeOrderItemAndIssueCredit(orderId: string, orderItemId
     // 1. Fetch the specific order item
     const { data: orderItem, error: itemError } = await supabaseAdmin
       .from('order_items')
-      .select('*')
+      .select('*, dishes(name, large_name)')
       .eq('id', orderItemId)
       .single();
 
     if (itemError || !orderItem) throw new Error('Order item not found');
     if (quantityToRemove > orderItem.quantity) throw new Error('Cannot remove more than the existing quantity');
 
-    // 2. Fetch the parent order
+    // 2. Fetch the parent order and parent details
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('*')
+      .select('*, parents(email, name)')
       .eq('id', orderId)
       .single();
 
@@ -99,6 +100,21 @@ export async function removeOrderItemAndIssueCredit(orderId: string, orderItemId
     }).eq('id', orderId);
 
     revalidatePath('/admin/orders');
+
+    // 7. Send the cancellation email notification
+    if (order.parents && order.parents.email) {
+      const dish = orderItem.dishes as any;
+      const dishName = orderItem.is_large && dish?.large_name ? dish.large_name : dish?.name;
+      await sendAdminCancellationEmail(
+        order.parents.email,
+        order.parents.name,
+        order.order_date,
+        dishName || 'Item',
+        quantityToRemove,
+        refundAmount
+      );
+    }
+
     return { success: true, refundAmount };
 
   } catch (error: any) {

@@ -268,7 +268,7 @@ export async function POST(req: NextRequest) {
               .single();
 
             if (parent) {
-              await sendOrderConfirmationEmail(parent.email, parent.name, totalCharged);
+              await sendOrderConfirmationEmail(parent.email, parent.name, orders.map(o => o.id));
             }
           }
         }
