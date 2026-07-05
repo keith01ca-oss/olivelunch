@@ -6,6 +6,7 @@ import { User, Users, CreditCard, MessageSquare, Phone, ChevronRight, ArrowLeft,
 import { submitSuggestion, updateChild, addChild } from '@/app/(parent)/settings/actions';
 import { getVipCancellationSummary, processVipCancellation } from '@/app/(parent)/vip/actions';
 import { toast } from 'sonner';
+import { parseAndFormatLunchTime } from '@/lib/utils';
 
 type Tab = 'account' | 'children' | 'vip' | 'credits' | 'suggestions' | 'contact';
 
@@ -81,8 +82,14 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
 
   // --- Handlers ---
   const handleSaveChild = async (childId: string) => {
+    const formattedLunchTime = parseAndFormatLunchTime(editData.lunch_time);
+    if (!formattedLunchTime) {
+      toast.error('Invalid lunch time. Please enter a valid 12-hour format time (e.g. 11:30 AM or 12:30 PM).');
+      return;
+    }
+
     setIsSaving(true);
-    const res = await updateChild(childId, editData);
+    const res = await updateChild(childId, { ...editData, lunch_time: formattedLunchTime });
     if (res.error) {
       toast.error(res.error);
     } else {
@@ -93,7 +100,7 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
         school_id: editData.school_id, 
         division: editData.division,
         delivery_location: editData.delivery_location,
-        lunch_time: editData.lunch_time,
+        lunch_time: formattedLunchTime,
         schools: { name: schools.find(s => s.id === editData.school_id)?.name || '' }
       } : c));
       setEditingChildId(null);
@@ -103,8 +110,18 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
 
   const handleAddChild = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
+    const lunchTimeInput = formData.get('lunchTime') as string;
+    const formattedLunchTime = parseAndFormatLunchTime(lunchTimeInput);
+
+    if (!formattedLunchTime) {
+      toast.error('Invalid lunch time. Please enter a valid 12-hour format time (e.g. 11:30 AM or 12:30 PM).');
+      return;
+    }
+
+    formData.set('lunchTime', formattedLunchTime);
+
+    setIsSaving(true);
     const res = await addChild(formData);
     if (res.error) {
       toast.error(res.error);

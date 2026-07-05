@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedParent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { parseAndFormatLunchTime } from '@/lib/utils';
 
 export async function POST(req: NextRequest) {
   const authContext = await getResolvedParent();
@@ -20,6 +21,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const formattedLunchTime = lunchTime ? parseAndFormatLunchTime(lunchTime) : null;
+    if (lunchTime && !formattedLunchTime) {
+      return NextResponse.json({ error: 'Invalid lunch time format. Please enter a valid 12-hour time (e.g. 11:30 AM).' }, { status: 400 });
+    }
+
     const { error } = await supabaseAdmin
       .from('children')
       .insert({
@@ -28,7 +34,7 @@ export async function POST(req: NextRequest) {
         school_id: schoolId,
         division,
         delivery_location: deliveryLocation || null,
-        lunch_time: lunchTime || null
+        lunch_time: formattedLunchTime || null
       });
 
     if (error) throw error;
@@ -40,3 +46,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to add child' }, { status: 500 });
   }
 }
+

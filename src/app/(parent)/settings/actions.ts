@@ -2,6 +2,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { parseAndFormatLunchTime } from '@/lib/utils';
 
 export async function submitSuggestion(parentId: string, content: string) {
   if (!content.trim()) return { error: 'Content cannot be empty' };
@@ -25,6 +26,14 @@ export async function submitSuggestion(parentId: string, content: string) {
 
 export async function updateChild(childId: string, data: { name: string, division: string, school_id: string, delivery_location?: string, lunch_time?: string }) {
   try {
+    if (data.lunch_time) {
+      const formatted = parseAndFormatLunchTime(data.lunch_time);
+      if (!formatted) {
+        return { error: 'Invalid lunch time format. Please enter a valid 12-hour time (e.g. 11:30 AM).' };
+      }
+      data.lunch_time = formatted;
+    }
+
     const { error } = await supabaseAdmin
       .from('children')
       .update(data)
@@ -50,6 +59,10 @@ export async function addChild(formData: FormData) {
     const division = formData.get('division') as string;
     const deliveryLocation = formData.get('deliveryLocation') as string;
     const lunchTime = formData.get('lunchTime') as string;
+    const formattedLunchTime = lunchTime ? parseAndFormatLunchTime(lunchTime) : '12:00 PM';
+    if (!formattedLunchTime) {
+      return { error: 'Invalid lunch time format. Please enter a valid 12-hour time (e.g. 11:30 AM).' };
+    }
 
     if (!orgId || !parentId || !name || !schoolId || !division) {
       return { error: 'Missing required fields' };
@@ -62,7 +75,7 @@ export async function addChild(formData: FormData) {
       name,
       division,
       delivery_location: deliveryLocation || 'Classroom',
-      lunch_time: lunchTime || '12:00 PM'
+      lunch_time: formattedLunchTime
     }]);
 
     if (error) throw error;

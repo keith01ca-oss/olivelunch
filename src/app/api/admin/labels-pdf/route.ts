@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import PDFDocument from 'pdfkit';
+import { getLunchTimeMinutes, formatTimeWithAmPm } from '@/lib/utils';
 
 // Avery 5160 specs (all in points: 1 inch = 72pt)
 const PT = 72; // points per inch
@@ -226,6 +227,7 @@ export async function GET(req: NextRequest) {
     if (field === 'school') return label.schoolName || '';
     if (field === 'division') return label.division || '';
     if (field === 'childName') return label.childName || '';
+    if (field === 'lunchTime') return getLunchTimeMinutes(label.lunchTime).toString().padStart(4, '0');
     return '';
   };
   const activeSorts = sortFields.length > 0 ? sortFields : ['dish'];
@@ -283,24 +285,7 @@ export async function GET(req: NextRequest) {
       )
       .restore();
 
-    // format time helper
-    const formatTimeWithAmPm = (timeStr?: string) => {
-      if (!timeStr) return '';
-      const lower = timeStr.trim().toLowerCase();
-      if (lower.includes('am') || lower.includes('pm')) return lower;
-      const parts = lower.split(':');
-      if (parts.length >= 2) {
-        let h = parseInt(parts[0], 10);
-        const m = parts[1].substring(0, 2);
-        if (!isNaN(h)) {
-          const ampm = h >= 12 ? 'pm' : 'am';
-          h = h % 12;
-          if (h === 0) h = 12;
-          return `${h}:${m}${ampm}`;
-        }
-      }
-      return lower;
-    };
+    // formatTimeWithAmPm is imported from @/lib/utils
 
     // Division badge (right of name)
     doc.save()

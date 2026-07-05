@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, addDays } from 'date-fns';
 import { Printer, Calendar, Download, ChefHat, Clock } from 'lucide-react';
+import { getLunchTimeMinutes, formatTimeWithAmPm } from '@/lib/utils';
 
 interface Ingredient {
   name: string;
@@ -49,7 +50,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
   const [activeTab, setActiveTab] = useState<'prep' | 'labels' | 'manifest'>(initialTab || 'prep');
 
   // Label sort state — 3 cascading sort fields
-  type SortField = 'dish' | 'school' | 'division' | 'childName' | '';
+  type SortField = 'dish' | 'school' | 'division' | 'childName' | 'lunchTime' | '';
   const [sort1, setSort1] = useState<SortField>('dish');
   const [sort2, setSort2] = useState<SortField>('school');
   const [sort3, setSort3] = useState<SortField>('');
@@ -178,6 +179,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
     if (field === 'school') return (label.child?.schools as any)?.name || '';
     if (field === 'division') return label.child?.division || '';
     if (field === 'childName') return label.child?.name || '';
+    if (field === 'lunchTime') return getLunchTimeMinutes(label.child?.lunch_time).toString().padStart(4, '0');
     return '';
   };
 
@@ -554,6 +556,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                     <option value="school">School Name</option>
                     <option value="division">Division / Class</option>
                     <option value="childName">Student Name</option>
+                    <option value="lunchTime">Lunch Time</option>
                   </select>
                 </div>
               ))}
@@ -734,23 +737,6 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   const schoolIconName = schoolIconMap[schoolName] || 'heart';
                   const schoolIconChar = ICON_EMOJI[schoolIconName] || '♥';
 
-                  const formatTimeWithAmPm = (timeStr?: string) => {
-                    if (!timeStr) return '';
-                    const lower = timeStr.trim().toLowerCase();
-                    if (lower.includes('am') || lower.includes('pm')) return lower;
-                    const parts = lower.split(':');
-                    if (parts.length >= 2) {
-                      let h = parseInt(parts[0], 10);
-                      const m = parts[1].substring(0, 2);
-                      if (!isNaN(h)) {
-                        const ampm = h >= 12 ? 'pm' : 'am';
-                        h = h % 12;
-                        if (h === 0) h = 12;
-                        return `${h}:${m}${ampm}`;
-                      }
-                    }
-                    return lower;
-                  };
                   const lunchTime = formatTimeWithAmPm(labelInfo.child?.lunch_time);
 
                   return (
@@ -875,7 +861,14 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                       {/* Divisions within this school */}
                       <div className="space-y-6 print:space-y-4">
                         {uniqueDivs.sort().map(div => {
-                           const divOrders = schoolOrders.filter(o => o.children?.division === div);
+                           const divOrders = schoolOrders
+                             .filter(o => o.children?.division === div)
+                             .sort((a, b) => {
+                               const timeA = getLunchTimeMinutes(a.children?.lunch_time);
+                               const timeB = getLunchTimeMinutes(b.children?.lunch_time);
+                               if (timeA !== timeB) return timeA - timeB;
+                               return (a.children?.name || '').localeCompare(b.children?.name || '');
+                             });
                            const color = divisionColors[`${schoolName}::${div}`] || { bg: '#f9f9f9', border: '#ccc' };
                            
                            // Aggregate items, separating large and regular versions, and splitting by label components
