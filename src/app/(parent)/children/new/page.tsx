@@ -18,11 +18,19 @@ export default async function NewChildPage() {
     .eq('org_id', orgId);
   const { data: schools } = await schoolQuery;
 
+  // Count existing children
+  const { count } = await supabaseAdmin
+    .from('children')
+    .select('*', { count: 'exact', head: true })
+    .eq('parent_id', parentId)
+    .is('deleted_at', null);
+
   return (
     <NewChildForm
       schools={schools || []}
       parentId={parentId!}
       orgId={orgId}
+      initialChildrenCount={count || 0}
     />
   );
 }

@@ -110,6 +110,10 @@ export default function SettingsClient({ parent, childrenList: initialChildren, 
 
   const handleAddChild = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (childrenList.length >= 4) {
+      toast.error('each account max 4 child');
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     const lunchTimeInput = formData.get('lunchTime') as string;
     const formattedLunchTime = parseAndFormatLunchTime(lunchTimeInput);

@@ -68,9 +68,21 @@ export async function addChild(formData: FormData) {
       return { error: 'Missing required fields' };
     }
 
+    // Count existing children for this parent
+    const { count, error: countErr } = await supabaseAdmin
+      .from('children')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', parentId)
+      .is('deleted_at', null);
+
+    if (countErr) throw countErr;
+
+    if (count !== null && count >= 4) {
+      return { error: 'each account max 4 child' };
+    }
+
     const { error } = await supabaseAdmin.from('children').insert([{
       parent_id: parentId,
-      org_id: orgId,
       school_id: schoolId,
       name,
       division,
@@ -85,6 +97,6 @@ export async function addChild(formData: FormData) {
     return { success: true };
   } catch (err: any) {
     console.error('Error adding child:', err);
-    return { error: 'Failed to add child' };
+    return { error: err.message || 'Failed to add child' };
   }
 }

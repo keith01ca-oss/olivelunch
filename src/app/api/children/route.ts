@@ -26,6 +26,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid lunch time format. Please enter a valid 12-hour time (e.g. 11:30 AM).' }, { status: 400 });
     }
 
+    // Count existing children for this parent
+    const { count, error: countErr } = await supabaseAdmin
+      .from('children')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', authContext.parentId)
+      .is('deleted_at', null);
+
+    if (countErr) throw countErr;
+
+    if (count !== null && count >= 4) {
+      return NextResponse.json({ error: 'each account max 4 child' }, { status: 400 });
+    }
+
     const { error } = await supabaseAdmin
       .from('children')
       .insert({

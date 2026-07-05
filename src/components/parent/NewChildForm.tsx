@@ -16,14 +16,21 @@ interface NewChildFormProps {
   schools: School[];
   parentId: string;
   orgId: string;
+  initialChildrenCount: number;
 }
 
-export default function NewChildForm({ schools, parentId, orgId }: NewChildFormProps) {
+export default function NewChildForm({ schools, parentId, orgId, initialChildrenCount }: NewChildFormProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    if (initialChildrenCount >= 4) {
+      toast.error('each account max 4 child');
+      return;
+    }
+
     setIsSaving(true);
 
     const formData = new FormData(e.currentTarget);
