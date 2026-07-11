@@ -14,6 +14,7 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
   // New State Features
   const [showWeekends, setShowWeekends] = useState(org?.settings?.show_weekends || false);
   const [selectedDishes, setSelectedDishes] = useState<any[]>([]);
+  const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]);
 
   const handleToggleWeekends = async (checked: boolean) => {
     setShowWeekends(checked);
@@ -172,6 +173,7 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
        
        if (!isCurrentMonth || isBlocked) return false;
        if (!showWeekends && isWeekend) return false;
+       if (!isWeekend && !selectedDaysOfWeek.includes(dayOfWeek)) return false;
        
        return true;
     });
@@ -368,6 +370,31 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
             >
               <CalendarPlus className="w-4 h-4" /> Add to Entire Month
             </button>
+            <div className="flex justify-between mt-3 px-1">
+              {[
+                { label: 'M', value: 1 },
+                { label: 'T', value: 2 },
+                { label: 'W', value: 3 },
+                { label: 'T', value: 4 },
+                { label: 'F', value: 5 },
+              ].map(day => (
+                <label key={day.value} className="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 rounded p-1">
+                  <span className="text-[10px] font-bold text-muted-foreground">{day.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={selectedDaysOfWeek.includes(day.value)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedDaysOfWeek(prev => [...prev, day.value]);
+                      } else {
+                        setSelectedDaysOfWeek(prev => prev.filter(v => v !== day.value));
+                      }
+                    }}
+                    className="w-3.5 h-3.5 accent-primary"
+                  />
+                </label>
+              ))}
+            </div>
             <p className="text-[10px] text-muted-foreground mt-2 text-center">Skips blocked dates and dates where dish is already added.</p>
           </div>
         )}
