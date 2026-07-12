@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         from: 'Olive Lunch Contact <orders@olivelunch.com>',
         to: 'info@olivelunch.com',
         reply_to: email,
-        subject: \`New Contact Form Submission: \${subject || 'No Subject'}\`,
+        subject: `New Contact Form Submission: ${subject || 'No Subject'}`,
         html,
       });
     } catch (emailError) {
