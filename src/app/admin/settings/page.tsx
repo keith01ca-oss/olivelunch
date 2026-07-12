@@ -28,6 +28,20 @@ export default async function AdminSettingsPage() {
     `)
     .order('created_at', { ascending: false });
 
+  // Fetch contact messages
+  let contactMessages = [];
+  try {
+    const { data: msgs } = await supabaseAdmin
+      .from('contact_messages')
+      .select('*')
+      .eq('status', 'unread')
+      .order('created_at', { ascending: false });
+    if (msgs) contactMessages = msgs;
+  } catch (err) {
+    // contact_messages table might not exist yet if migration isn't run
+    console.warn('contact_messages table fetch failed:', err);
+  }
+
   // Fetch active messages
   const { data: dbMessages } = await supabaseAdmin
     .from('dashboard_messages')
@@ -42,6 +56,7 @@ export default async function AdminSettingsPage() {
     <SettingsClient
       org={org}
       initialSuggestions={(suggestions as any) || []}
+      initialContactMessages={contactMessages || []}
       initialInfoMessage={infoMessage}
       initialWarningMessage={warningMessage}
     />

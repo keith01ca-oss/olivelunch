@@ -7,19 +7,22 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { saveDashboardMessages, deleteSuggestion } from '@/app/admin/settings/actions';
+import { resolveContactMessage } from '@/app/admin/settings/contact-actions';
 
 export default function SettingsClient({ 
   org, 
   initialSuggestions,
+  initialContactMessages,
   initialInfoMessage,
   initialWarningMessage
 }: { 
   org: any;
   initialSuggestions: any[];
+  initialContactMessages: any[];
   initialInfoMessage: string;
   initialWarningMessage: string;
 }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'announcements' | 'suggestions' | 'vip'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'announcements' | 'suggestions' | 'inquiries' | 'vip'>('general');
   const [categories, setCategories] = useState<string[]>(org?.settings?.categories || ['main', 'side', 'snack', 'drink']);
   const [units, setUnits] = useState<string[]>(org?.settings?.units || ['g', 'kg', 'ml', 'L', 'cups', 'tbsp', 'tsp', 'pcs', 'oz', 'lbs', 'slices', 'cans', 'bags', 'chunk', 'pinch']);
   const [contactPhone, setContactPhone] = useState<string>(org?.settings?.contact_phone || '');
@@ -31,10 +34,12 @@ export default function SettingsClient({
 
   // Announcement & Suggestion State variables
   const [suggestions, setSuggestions] = useState<any[]>(initialSuggestions);
+  const [contactMessages, setContactMessages] = useState<any[]>(initialContactMessages);
   const [infoMessage, setInfoMessage] = useState(initialInfoMessage);
   const [warningMessage, setWarningMessage] = useState(initialWarningMessage);
   const [isSavingAnnouncements, setIsSavingAnnouncements] = useState(false);
   const [isDeletingSuggestion, setIsDeletingSuggestion] = useState<string | null>(null);
+  const [isResolvingMessage, setIsResolvingMessage] = useState<string | null>(null);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -91,6 +96,22 @@ export default function SettingsClient({
       toast.error(err.message || 'Failed to resolve suggestion');
     } finally {
       setIsDeletingSuggestion(null);
+    }
+  };
+
+  const handleResolveContactMessage = async (id: string) => {
+    if (!confirm('Mark this inquiry as resolved and remove it from the list?')) return;
+    setIsResolvingMessage(id);
+    try {
+      const res = await resolveContactMessage(id);
+      if (res.success) {
+        setContactMessages(prev => prev.filter(m => m.id !== id));
+        toast.success('Inquiry resolved successfully');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resolve inquiry');
+    } finally {
+      setIsResolvingMessage(null);
     }
   };
 
@@ -163,6 +184,17 @@ export default function SettingsClient({
         >
           <MessageSquare className="w-4 h-4" />
           Suggestions ({suggestions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('inquiries')}
+          className={`px-4 py-2.5 text-sm font-extrabold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+            activeTab === 'inquiries'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Mail className="w-4 h-4" />
+          Inquiries ({contactMessages.length})
         </button>
         <button
           onClick={() => setActiveTab('vip')}
@@ -398,6 +430,59 @@ export default function SettingsClient({
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                     )}
                     Resolve Feedback
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'inquiries' && (
+        <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-6">
+          <div className="border-b pb-2">
+            <h2 className="font-bold text-slate-800 uppercase tracking-wider text-sm flex items-center gap-1.5"><Mail className="w-4 h-4 text-primary" /> Contact Inquiries</h2>
+            <p className="text-xs text-muted-foreground mt-1">Review inquiries submitted from the public contact page. Mark as resolved to clear them.</p>
+          </div>
+
+          {contactMessages.length === 0 ? (
+            <div className="text-center py-16 bg-muted/25 rounded-2xl border border-dashed flex flex-col items-center justify-center p-6 text-muted-foreground">
+              <CheckCircle className="w-12 h-12 text-emerald-500 mb-3" />
+              <h3 className="font-extrabold text-slate-900 text-lg">All Caught Up!</h3>
+              <p className="text-sm font-medium mt-1">No unread inquiries at this time.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {contactMessages.map((m) => (
+                <div key={m.id} className="bg-muted/30 border border-border/80 rounded-2xl p-5 flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all hover:bg-muted/40 animate-in fade-in duration-200">
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap text-sm">
+                      <span className="font-extrabold text-slate-900">{m.name}</span>
+                      <a href={`mailto:${m.email}`} className="text-xs text-primary font-bold hover:underline">
+                        {m.email}
+                      </a>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        · {new Date(m.created_at).toLocaleDateString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                      </span>
+                    </div>
+                    {m.subject && (
+                      <h4 className="font-bold text-sm text-slate-700">Subject: {m.subject}</h4>
+                    )}
+                    <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed bg-white/70 border border-white p-3.5 rounded-xl shadow-inner">
+                      {m.message}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleResolveContactMessage(m.id)}
+                    disabled={isResolvingMessage === m.id}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2 border rounded-xl hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-xs font-bold text-slate-600 transition-colors shadow-sm bg-card shrink-0 disabled:opacity-50"
+                  >
+                    {isResolvingMessage === m.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    )}
+                    Resolve Inquiry
                   </button>
                 </div>
               ))}
