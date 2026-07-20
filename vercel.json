@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/keep-alive",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/cron/vip-summer-credit",
       "schedule": "0 8 1 7 *"
     },
