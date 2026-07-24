@@ -462,7 +462,7 @@ export default function SettingsClient({
                         {m.email}
                       </a>
                       <span className="text-xs text-muted-foreground font-medium">
-                        · {new Date(m.created_at).toLocaleDateString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                        · {new Date(m.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                       </span>
                     </div>
                     {m.subject && (
