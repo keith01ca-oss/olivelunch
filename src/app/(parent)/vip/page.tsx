@@ -66,7 +66,7 @@ export default async function VIPPage() {
           
           <ul className="space-y-6 relative z-10 flex-grow">
             {[
-              { title: "Save up to 30% on every order !", desc: "Meals for just $4.99 (reg $7.95)." },
+              { title: "Save up to 30% on every order !", desc: "Meals for just $5.99 (reg $7.95)." },
               { title: "VIP Member", desc: "Vip Yearly get 10% off, Monthly subscription get $9.99 credit back for July and Aug" },
               { title: "Sick day protection", desc: "If your child is absent, text us by 8:30 AM that morning. We will issue a 100% full credit back." },
               { title: "Priority Customer Support", desc: "Jump to the front of the line if you ever need help or adjustments." },
