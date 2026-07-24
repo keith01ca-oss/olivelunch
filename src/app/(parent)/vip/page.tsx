@@ -10,13 +10,33 @@ export default async function VIPPage() {
   const orgId = await getOrResolveOrgId();
 
   // Fetch sample dishes for the comparison table
-  const { data: sampleDishes } = await supabaseAdmin
+  const { data: dbDishes } = await supabaseAdmin
     .from('dishes')
     .select('name, price_regular, price_vip')
     .eq('is_active', true)
-    .eq('org_id', orgId)
-    .eq('category', 'main')
-    .limit(4);
+    .eq('org_id', orgId);
+
+  const fallbackDishes = [
+    { name: 'Italian Meatball Pasta', price_regular: 7.95, price_vip: 5.99 },
+    { name: '[4pc] Wagyu Beef Gyoza', price_regular: 7.50, price_vip: 5.49 },
+    { name: '[4pc] Chicken Nuggets w/ Plum Sauce', price_regular: 5.95, price_vip: 4.49 },
+    { name: '[4pc] Spring Roll + Wagyu Gyoza Combo', price_regular: 6.49, price_vip: 4.99 },
+  ];
+
+  const sampleDishes = fallbackDishes.map((fb) => {
+    const matched = dbDishes?.find(
+      (d) => d.name.toLowerCase().includes('wagyu gyoza combo') && fb.name.toLowerCase().includes('wagyu gyoza combo')
+    ) || dbDishes?.find(
+      (d) => d.name.replace(/\s+/g, ' ').trim() === fb.name
+    );
+    return matched
+      ? {
+          name: fb.name,
+          price_regular: Number(matched.price_regular),
+          price_vip: Number(matched.price_vip),
+        }
+      : fb;
+  });
 
   return (
     <div className="max-w-7xl mx-auto mt-8 mb-20 px-4 sm:px-6">
@@ -46,8 +66,8 @@ export default async function VIPPage() {
           
           <ul className="space-y-6 relative z-10 flex-grow">
             {[
-              { title: "Save up to 50% on every order", desc: "Meals for just $4.99 (reg $7.95)." },
-              { title: "Discounted Sides & Drinks", desc: "Enjoy flat discounts on all add-ons to complete their lunch." },
+              { title: "Save up to 30% on every order !", desc: "Meals for just $4.99 (reg $7.95)." },
+              { title: "VIP Member", desc: "Vip Yearly get 10% off, Monthly subscription get $9.99 credit back for July and Aug" },
               { title: "Sick day protection", desc: "If your child is absent, text us by 8:30 AM that morning. We will issue a 100% full credit back." },
               { title: "Priority Customer Support", desc: "Jump to the front of the line if you ever need help or adjustments." },
               { title: "No commitments, cancel anytime", desc: "Manage your subscription instantly from your dashboard." }
