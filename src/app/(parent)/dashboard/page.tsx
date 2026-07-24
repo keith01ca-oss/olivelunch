@@ -265,9 +265,9 @@ export default async function DashboardPage({
                 <Star className="h-5 w-5 text-accent fill-accent" />
                 <h3 className="text-base font-black text-slate-900 uppercase tracking-widest">VIP Benefit</h3>
               </div>
-              <p className="text-2xl font-black text-foreground leading-tight">Join VIP & save up to 50% on every meal!</p>
+              <p className="text-2xl font-black text-foreground leading-tight">Join VIP & save up to 30% on every meal!</p>
               <p className="text-sm text-slate-800 mt-3 font-medium leading-relaxed">
-                Get favorites like our 4pc Chicken Strips for just $4 (was $6.95)—that’s <strong className="text-primary font-bold">42% off!</strong>
+                Get favorites like our 4pc Golden Chicken Tender for just $4.99 (was $6.95)—that’s <strong className="text-primary font-bold">28% off!</strong>
               </p>
             </div>
 
