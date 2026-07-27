@@ -490,10 +490,10 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
             <button
               onClick={handleAddAllActiveDishesToMonth}
               className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold border rounded-xl py-2 px-3 transition-colors bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-              title={`Add all ${initialDishes.length} dishes to the entire month`}
+              title={`Schedule all ${initialDishes.length} catalog dishes onto selected days for ${format(currentMonth, 'MMMM')}`}
             >
               <CalendarPlus className="w-3.5 h-3.5 shrink-0" /> 
-              Add All
+              Add Entire Catalog
             </button>
             {scheduledMenus.length > 0 && (
               <button
@@ -503,10 +503,10 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
                   ? 'text-red-700 border-red-300 bg-red-100 hover:bg-red-200' 
                   : 'text-red-600 border-red-200 bg-red-50 hover:bg-red-100'
                 }`}
-                title={selectedDishes.length > 0 ? "Remove selected" : "Remove all scheduled dishes"}
+                title={selectedDishes.length > 0 ? `Remove ${selectedDishes.length} selected dishes from ${format(currentMonth, 'MMMM')}` : `Remove all scheduled dishes for ${format(currentMonth, 'MMMM')}`}
               >
                 <Trash2 className="w-3.5 h-3.5 shrink-0" /> 
-                {selectedDishes.length > 0 ? 'Selected' : 'Clear All'}
+                {selectedDishes.length > 0 ? `Clear Selected (${selectedDishes.length})` : 'Clear Entire Month'}
               </button>
             )}
           </div>
