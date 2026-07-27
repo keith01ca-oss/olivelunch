@@ -160,30 +160,58 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
     }
   };
 
+  const availableDays = useMemo(() => {
+    const days = [
+      { label: 'M', value: 1, full: 'Mon' },
+      { label: 'T', value: 2, full: 'Tue' },
+      { label: 'W', value: 3, full: 'Wed' },
+      { label: 'T', value: 4, full: 'Thu' },
+      { label: 'F', value: 5, full: 'Fri' },
+    ];
+    if (showWeekends) {
+      days.push({ label: 'S', value: 6, full: 'Sat' });
+      days.push({ label: 'S', value: 0, full: 'Sun' });
+    }
+    return days;
+  }, [showWeekends]);
+
+  // Helper to compute valid target dates in current month based on day-of-week filter
+  const getValidTargetDates = (daysFilter: number[] = selectedDaysOfWeek) => {
+    return calendarDays.filter(date => {
+      const isCurrentMonth = isSameMonth(date, currentMonth);
+      if (!isCurrentMonth) return false;
+
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const isBlocked = blockedDates.some(b => b.date === dateKey);
+      if (isBlocked) return false;
+
+      const dayOfWeek = getDay(date);
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      if (!showWeekends && isWeekend) return false;
+
+      if (!daysFilter.includes(dayOfWeek)) return false;
+
+      return true;
+    });
+  };
+
   const handleAddDishesToAllMonth = async () => {
     if (selectedDishes.length === 0) return;
     
-    // Find all valid dates in current month
-    const validDates = calendarDays.filter(date => {
-       const isCurrentMonth = isSameMonth(date, currentMonth);
-       const dateKey = format(date, 'yyyy-MM-dd');
-       const isBlocked = blockedDates.some(b => b.date === dateKey);
-       const dayOfWeek = getDay(date);
-       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-       
-       if (!isCurrentMonth || isBlocked) return false;
-       if (!showWeekends && isWeekend) return false;
-       if (!isWeekend && !selectedDaysOfWeek.includes(dayOfWeek)) return false;
-       
-       return true;
-    });
+    const validDates = getValidTargetDates(selectedDaysOfWeek);
 
     if (validDates.length === 0) {
-      toast.info('No valid dates available to schedule.');
+      toast.info('No valid dates available for the selected days.');
       return;
     }
 
-    if (!confirm(`Add ${selectedDishes.length} dishes to ${validDates.length} days in ${format(currentMonth, 'MMMM')}?`)) return;
+    const selectedDayLabels = availableDays
+      .filter(d => selectedDaysOfWeek.includes(d.value))
+      .map(d => d.full)
+      .join(', ');
+
+    const promptMsg = `Add ${selectedDishes.length} dish(es) to ${selectedDayLabels} (${validDates.length} days) in ${format(currentMonth, 'MMMM')}?`;
+    if (!confirm(promptMsg)) return;
 
     setIsSaving(true);
     try {
@@ -213,9 +241,9 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
       if (data.error) throw new Error(data.error);
       
       setScheduledMenus(prev => [...prev, ...(data.menus || [])]);
-      toast.success(`Successfully scheduled ${inserts.length} items`);
-    } catch (e) {
-      toast.error('Failed to schedule bulk items');
+      toast.success(`Successfully scheduled ${inserts.length} item(s)`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to schedule bulk items');
     } finally {
       setIsSaving(false);
       setSelectedDishes([]);
@@ -226,26 +254,19 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
     const dishesToAdd = initialDishes;
     if (dishesToAdd.length === 0) return;
     
-    // Find all valid dates in current month
-    const validDates = calendarDays.filter(date => {
-       const isCurrentMonth = isSameMonth(date, currentMonth);
-       const dateKey = format(date, 'yyyy-MM-dd');
-       const isBlocked = blockedDates.some(b => b.date === dateKey);
-       const dayOfWeek = getDay(date);
-       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-       
-       if (!isCurrentMonth || isBlocked) return false;
-       if (!showWeekends && isWeekend) return false;
-       
-       return true;
-    });
+    const validDates = getValidTargetDates(selectedDaysOfWeek);
 
     if (validDates.length === 0) {
-      toast.info('No valid dates available to schedule.');
+      toast.info('No valid dates available for the selected days.');
       return;
     }
 
-    if (!confirm(`Add ALL ${dishesToAdd.length} dishes to ${validDates.length} days in ${format(currentMonth, 'MMMM')}?`)) return;
+    const selectedDayLabels = availableDays
+      .filter(d => selectedDaysOfWeek.includes(d.value))
+      .map(d => d.full)
+      .join(', ');
+
+    if (!confirm(`Add ALL ${dishesToAdd.length} dishes to ${selectedDayLabels} (${validDates.length} days) in ${format(currentMonth, 'MMMM')}?`)) return;
 
     setIsSaving(true);
     try {
@@ -276,8 +297,8 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
       
       setScheduledMenus(prev => [...prev, ...(data.menus || [])]);
       toast.success(`Successfully scheduled ${inserts.length} items`);
-    } catch (e) {
-      toast.error('Failed to schedule bulk items');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to schedule bulk items');
     } finally {
       setIsSaving(false);
     }
@@ -355,47 +376,102 @@ export default function PlannerClient({ initialDishes, blockedDates, org }: { in
 
         {/* Selected Dishes Bulk Action Box */}
         {selectedDishes.length > 0 && (
-          <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 shadow-sm animate-fade-in-up">
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="font-bold text-sm text-primary uppercase tracking-wider">Bulk Add</h3>
-              <button onClick={() => setSelectedDishes([])} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4"/></button>
+          <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 shadow-sm animate-fade-in-up space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-bold text-xs text-primary uppercase tracking-wider">Bulk Add</h3>
+                <p className="font-bold text-base leading-tight">{selectedDishes.length} dishes selected</p>
+              </div>
+              <button onClick={() => setSelectedDishes([])} className="text-muted-foreground hover:text-foreground p-1 rounded-md">
+                <X className="w-4 h-4"/>
+              </button>
             </div>
-            <p className="font-bold text-lg leading-tight mb-1">{selectedDishes.length} dishes selected</p>
-            <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+            
+            <p className="text-xs text-muted-foreground line-clamp-2">
               {selectedDishes.map(d => d.name).join(', ')}
             </p>
-            <button 
-              onClick={handleAddDishesToAllMonth}
-              className="w-full bg-primary text-primary-foreground font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors shadow-sm text-sm"
-            >
-              <CalendarPlus className="w-4 h-4" /> Add to Entire Month
-            </button>
-            <div className="flex justify-between mt-3 px-1">
-              {[
-                { label: 'M', value: 1 },
-                { label: 'T', value: 2 },
-                { label: 'W', value: 3 },
-                { label: 'T', value: 4 },
-                { label: 'F', value: 5 },
-              ].map(day => (
-                <label key={day.value} className="flex flex-col items-center gap-1 cursor-pointer hover:bg-black/5 rounded p-1">
-                  <span className="text-[10px] font-bold text-muted-foreground">{day.label}</span>
-                  <input
-                    type="checkbox"
-                    checked={selectedDaysOfWeek.includes(day.value)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedDaysOfWeek(prev => [...prev, day.value]);
-                      } else {
-                        setSelectedDaysOfWeek(prev => prev.filter(v => v !== day.value));
-                      }
-                    }}
-                    className="w-3.5 h-3.5 accent-primary"
-                  />
-                </label>
-              ))}
+
+            {/* Day Selector */}
+            <div className="space-y-1.5 pt-2 border-t border-primary/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground">Days to Add:</span>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedDaysOfWeek(availableDays.map(d => d.value))}
+                    className="text-[10px] text-primary hover:underline font-medium"
+                  >
+                    All
+                  </button>
+                  <span className="text-[10px] text-muted-foreground">|</span>
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedDaysOfWeek([])}
+                    className="text-[10px] text-muted-foreground hover:underline font-medium"
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-between gap-1">
+                {availableDays.map(day => {
+                  const isChecked = selectedDaysOfWeek.includes(day.value);
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDaysOfWeek(prev => 
+                          isChecked ? prev.filter(v => v !== day.value) : [...prev, day.value]
+                        );
+                      }}
+                      className={`
+                        flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all flex flex-col items-center justify-center
+                        ${isChecked 
+                          ? 'bg-primary text-primary-foreground border-primary shadow-xs' 
+                          : 'bg-background text-muted-foreground border-input hover:border-primary/40'}
+                      `}
+                    >
+                      <span>{day.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2 text-center">Skips blocked dates and dates where dish is already added.</p>
+
+            {/* Dynamic Action Button */}
+            {(() => {
+              const validDates = getValidTargetDates(selectedDaysOfWeek);
+              const isAllDaysSelected = availableDays.length === selectedDaysOfWeek.length;
+              const selectedDayLabels = availableDays
+                .filter(d => selectedDaysOfWeek.includes(d.value))
+                .map(d => d.full)
+                .join(', ');
+
+              return (
+                <div className="pt-1">
+                  <button 
+                    onClick={handleAddDishesToAllMonth}
+                    disabled={selectedDaysOfWeek.length === 0 || validDates.length === 0}
+                    className="w-full bg-primary text-primary-foreground font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors shadow-sm text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CalendarPlus className="w-4 h-4 shrink-0" />
+                    {selectedDaysOfWeek.length === 0 
+                      ? 'Select at least 1 day'
+                      : isAllDaysSelected
+                        ? `Add ${selectedDishes.length} Dish(es) to Entire Month (${validDates.length} days)`
+                        : `Add ${selectedDishes.length} Dish(es) to ${selectedDayLabels} (${validDates.length} days)`
+                    }
+                  </button>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
+                    {validDates.length > 0 
+                      ? `Schedules onto ${validDates.length} date(s) in ${format(currentMonth, 'MMMM')}. Skips blocked dates.`
+                      : 'No dates match the selected day filter.'}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         )}
 

@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       await resend.emails.send({
         from: 'Olive Lunch Contact <orders@olivelunch.com>',
         to: 'info@olivelunch.com',
-        reply_to: email,
+        replyTo: email,
         subject: `New Contact Form Submission: ${subject || 'No Subject'}`,
         html,
       });
