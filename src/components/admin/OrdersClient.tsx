@@ -10,6 +10,22 @@ import {
 import { updateOrderStatuses, deleteOrdersAdmin } from '@/app/admin/orders/actions';
 import EditOrderModal from '@/components/admin/EditOrderModal';
 import AddOrderModal from '@/components/admin/AddOrderModal';
+import { formatLocalDate } from '@/lib/utils';
+
+const DIVISION_COLOR_PALETTE = [
+  { bg: '#ebf3ff', border: '#3b6fd4', text: '#1e40af' }, // blue
+  { bg: '#feebe8', border: '#d43b3b', text: '#b91c1c' }, // red
+  { bg: '#eef8f2', border: '#2e8b57', text: '#166534' }, // green
+  { bg: '#fef9c3', border: '#ca8a04', text: '#854d0e' }, // amber/yellow
+  { bg: '#f4effd', border: '#7b3bd4', text: '#6b21a8' }, // purple
+  { bg: '#e8f8f5', border: '#1a9e8e', text: '#0f766e' }, // teal
+  { bg: '#fdf0f7', border: '#c43b8a', text: '#9d174d' }, // pink
+  { bg: '#fef3ec', border: '#ea580c', text: '#9a3412' }, // orange
+  { bg: '#e0f2fe', border: '#0284c7', text: '#075985' }, // cyan
+  { bg: '#ecfccb', border: '#65a30d', text: '#365314' }, // lime
+  { bg: '#e0e7ff', border: '#4f46e5', text: '#3730a3' }, // indigo
+  { bg: '#f3f4f6', border: '#6b7280', text: '#374151' }, // gray fallback
+];
 
 type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded';
 
@@ -197,8 +213,30 @@ export default function OrdersClient({
   const printLabels = () => {
     const paidOrders = filtered.filter(o => o.status === 'paid');
     if (paidOrders.length === 0) { alert('No paid orders to print.'); return; }
+
+    // Per-school division color map:
+    // Divisions within the SAME school are always distinct colors
+    const schoolDivMap: Record<string, string[]> = {};
+    paidOrders.forEach(o => {
+      const school = o.children?.schools?.name || '__unknown__';
+      const div = o.children?.division || '';
+      if (!div) return;
+      if (!schoolDivMap[school]) schoolDivMap[school] = [];
+      if (!schoolDivMap[school].includes(div)) schoolDivMap[school].push(div);
+    });
+    const divColorMap: Record<string, { bg: string; border: string; text: string }> = {};
+    Object.entries(schoolDivMap).forEach(([school, divs]) => {
+      divs.forEach((div, i) => {
+        divColorMap[`${school}::${div}`] = DIVISION_COLOR_PALETTE[i % DIVISION_COLOR_PALETTE.length];
+      });
+    });
+
     const labelItems: any[] = [];
     paidOrders.forEach(o => {
+      const school = o.children?.schools?.name || '';
+      const div = o.children?.division || '';
+      const divColor = divColorMap[`${school}::${div}`] || { bg: '#ebf3ff', border: '#3b6fd4', text: '#1e40af' };
+
       o.order_items.forEach(item => {
         const comps = item.dishes?.label_components;
         if (comps && comps.length > 0) {
@@ -206,7 +244,8 @@ export default function OrdersClient({
             labelItems.push({ 
               order: o, 
               item, 
-              school: o.children?.schools?.name || '', 
+              school,
+              divColor,
               route: o.children?.schools?.school_routes?.[0]?.routes?.route_number || '',
               stopOrder: o.children?.schools?.school_routes?.[0]?.stop_order || 0,
               componentName: compName,
@@ -218,7 +257,8 @@ export default function OrdersClient({
           labelItems.push({ 
             order: o, 
             item, 
-            school: o.children?.schools?.name || '', 
+            school,
+            divColor,
             route: o.children?.schools?.school_routes?.[0]?.routes?.route_number || '',
             stopOrder: o.children?.schools?.school_routes?.[0]?.stop_order || 0
           });
@@ -239,23 +279,85 @@ export default function OrdersClient({
       return a.route.localeCompare(b.route);
     });
 
-    const html = `<!DOCTYPE html><html><head><style>
+    const html = `<!DOCTYPE html><html><head><title>Packing Labels</title><style>
         * { margin: 0; padding: 0; box-sizing: border-box; } 
-        body { font-family: Arial, sans-serif; } 
+        body { 
+          font-family: Arial, sans-serif; 
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important; 
+        } 
         .page { width: 8.125in; margin: 0 auto; } 
         .grid { display: grid; grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: 0.125in; row-gap: 0; }
-        .label { width: 2.625in; height: 1in; padding: 0.1in 0.15in; border: 1px dashed #ccc; display: flex; flex-direction: column; justify-content: center; overflow: hidden; page-break-inside: avoid; }
+        .label { 
+          width: 2.625in; 
+          height: 1in; 
+          padding: 0.08in 0.12in 0.08in 0.22in; 
+          border: 1px dashed #ccc; 
+          display: flex; 
+          flex-direction: column; 
+          justify-content: center; 
+          overflow: hidden; 
+          page-break-inside: avoid; 
+          position: relative;
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important; 
+        }
+        .color-strip {
+          position: absolute;
+          left: 0.04in;
+          top: 0.08in;
+          bottom: 0.08in;
+          width: 6px;
+          border-radius: 3px;
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important; 
+        }
         .row { display: flex; justify-content: space-between; align-items: baseline; white-space: nowrap; overflow: hidden; }
-        .main-text { font-size: 12px; font-weight: 900; text-overflow: ellipsis; overflow: hidden; }
-        .date-text { font-size: 9px; font-weight: bold; color: #555; margin-left: 4px; }
-        .school-row { font-size: 10px; color: #333; text-overflow: ellipsis; overflow: hidden; justify-content: flex-start; margin-top: 2px; margin-bottom: 3px; font-weight: 600;}
-        .dish-row { font-size: 12px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; justify-content: flex-start; border-top: 1px solid #ddd; padding-top: 3px;}
-        @media print { .label { border: none; } @page { margin: 0.5in 0.1875in; size: 8.5in 11in; } }
+        .main-text { 
+          font-size: 11.5px; 
+          font-weight: 900; 
+          text-overflow: ellipsis; 
+          overflow: hidden; 
+          display: flex; 
+          align-items: center; 
+          gap: 4px; 
+          min-width: 0;
+          flex: 1;
+        }
+        .div-badge {
+          font-size: 9px;
+          font-weight: 900;
+          padding: 1px 4px;
+          border-radius: 3px;
+          border-width: 1px;
+          border-style: solid;
+          flex-shrink: 0;
+          line-height: 1.1;
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important; 
+        }
+        .child-name {
+          text-overflow: ellipsis;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+        .date-text { font-size: 9px; font-weight: bold; color: #555; margin-left: 4px; flex-shrink: 0; }
+        .school-row { font-size: 9.5px; color: #333; text-overflow: ellipsis; overflow: hidden; justify-content: flex-start; margin-top: 2px; margin-bottom: 3px; font-weight: 600;}
+        .dish-row { font-size: 11.5px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; justify-content: flex-start; border-top: 1px solid #ddd; padding-top: 3px;}
+        @media print { 
+          .label { border: none; } 
+          @page { margin: 0.5in 0.1875in; size: 8.5in 11in; } 
+          .color-strip { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
       </style></head><body><div class="page"><div class="grid">${labelItems.map(li => `
         <div class="label">
+          <div class="color-strip" style="background-color: ${li.divColor.border};"></div>
           <div class="row">
-            <span class="main-text">${li.order.children?.division || ''} - ${li.order.children?.name || 'Unknown'}</span>
-            <span class="date-text">${new Date(li.order.order_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+            <span class="main-text">
+              ${li.order.children?.division ? `<span class="div-badge" style="background-color: ${li.divColor.bg}; border-color: ${li.divColor.border}; color: ${li.divColor.text};">${li.order.children.division}</span>` : ''}
+              <span class="child-name">${li.order.children?.name || 'Unknown'}</span>
+            </span>
+            <span class="date-text">${formatLocalDate(li.order.order_date, {month: 'short', day: 'numeric'})}</span>
           </div>
           <div class="row school-row">
             ${li.route ? `Route ${li.route}` : 'No Route'} - ${li.school}
@@ -339,7 +441,7 @@ export default function OrdersClient({
         <div class="page">
           <div class="header">
             <h1>DRIVER MANIFEST - Route ${routeObj.route}</h1>
-            <p><strong>Delivery Date:</strong> ${dateFilter ? new Date(dateFilter).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'All Dates (Not Filtered)'}</p>
+            <p><strong>Delivery Date:</strong> ${formatLocalDate(dateFilter, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) || 'All Dates (Not Filtered)'}</p>
             <p style="font-size: 18px; margin-top: 10px;"><strong>TOTAL ROUTE BOXES: ${routeTotalBoxes}</strong></p>
           </div>
           <div class="stops">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, addDays } from 'date-fns';
 import { Printer, Calendar, Download, ChefHat, Clock } from 'lucide-react';
-import { getLunchTimeMinutes, formatTimeWithAmPm } from '@/lib/utils';
+import { getLunchTimeMinutes, formatTimeWithAmPm, formatLocalDate } from '@/lib/utils';
 
 interface Ingredient {
   name: string;
@@ -331,8 +331,8 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
               margin: 0;
             }
 
-            /* White only - no ink waste */
-            html, body, * {
+            /* Print background setup */
+            html, body {
               background: white !important;
               background-color: white !important;
               -webkit-print-color-adjust: exact !important;
@@ -461,8 +461,16 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
               max-width: 70% !important;
             }
 
-            /* Hide screen-only decorations */
-            .label-color-strip { display: none !important; }
+            /* Ensure division color strip and badges show in print */
+            .label-color-strip {
+              display: block !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .avery-label .label-div-badge {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
             .avery-label .large-indicator {
               color: #d43b3b !important;
               font-weight: 900 !important;
@@ -731,7 +739,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   const displayName = labelInfo.componentName 
                     ? labelInfo.componentName 
                     : (isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || ''));
-                  const printDate = selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                  const printDate = formatLocalDate(selectedDate, { month: 'short', day: 'numeric', year: 'numeric' });
                   // Sequential unique icon per school (guaranteed no collisions)
                   // ECS EC is always 'cross'; all other schools get sequential pictographic icons
                   const schoolIconName = schoolIconMap[schoolName] || 'heart';

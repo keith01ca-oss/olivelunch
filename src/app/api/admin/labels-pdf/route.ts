@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import PDFDocument from 'pdfkit';
-import { getLunchTimeMinutes, formatTimeWithAmPm } from '@/lib/utils';
+import { getLunchTimeMinutes, formatTimeWithAmPm, formatLocalDate } from '@/lib/utils';
 
 // Avery 5160 specs (all in points: 1 inch = 72pt)
 const PT = 72; // points per inch
@@ -240,7 +240,7 @@ export async function GET(req: NextRequest) {
   });
 
   // Format date
-  const printDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+  const printDate = formatLocalDate(date, {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 

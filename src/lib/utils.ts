@@ -140,3 +140,15 @@ export function formatTimeWithAmPm(timeStr?: string): string {
   return formatted || timeStr;
 }
 
+export function formatLocalDate(dateStr?: string | null, options?: Intl.DateTimeFormatOptions): string {
+  if (!dateStr) return '';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-').map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    const [y, m, d] = parts;
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('en-US', options || { month: 'short', day: 'numeric' });
+  }
+  return dateStr;
+}
+
