@@ -737,52 +737,58 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   const displayName = labelInfo.componentName 
                     ? labelInfo.componentName 
                     : (isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || ''));
-                  const printDate = formatLocalDate(selectedDate, { month: 'short', day: 'numeric', year: 'numeric' });
+                  const printDate = formatLocalDate(selectedDate, { month: 'short', day: 'numeric' });
                   // Sequential unique icon per school (guaranteed no collisions)
                   // ECS EC is always 'cross'; all other schools get sequential pictographic icons
                   const schoolIconName = schoolIconMap[schoolName] || 'heart';
                   const schoolIconChar = ICON_EMOJI[schoolIconName] || '♥';
 
                   const lunchTime = formatTimeWithAmPm(labelInfo.child?.lunch_time);
+                  const routeNumber = (labelInfo.child?.schools as any)?.school_routes?.[0]?.routes?.route_number || '';
+                  const stopOrder = (labelInfo.child?.schools as any)?.school_routes?.[0]?.stop_order || 0;
+                  let routeText = '';
+                  if (routeNumber) routeText += `Rt ${routeNumber}`;
+                  if (stopOrder > 0) routeText += (routeText ? ` - Stop ${stopOrder}` : `Stop ${stopOrder}`);
 
                   return (
                     <div
                       key={`${labelInfo.orderId}-${labelInfo.dishId}-${index}`}
-                      className="avery-label border-2 rounded-2xl p-3 bg-white shadow-sm flex flex-col gap-1 relative overflow-hidden"
+                      className="avery-label border-2 rounded-2xl p-2.5 bg-white shadow-sm flex flex-col justify-between relative overflow-hidden"
                       style={{ borderColor: color.border }}
                     >
                       {/* Color strip on left edge */}
                       <div className="label-color-strip absolute top-0 left-0 bottom-0 w-1.5" style={{ backgroundColor: color.border }} />
 
-                      {/* ROW 1: Name + Div badge */}
-                      <div className="label-row1 flex items-center gap-1.5 pl-3">
-                        <span className="label-name font-black text-sm uppercase truncate flex-1 leading-none">{labelInfo.child?.name}</span>
-                        <span
-                          className="label-div-badge text-[10px] font-black px-1.5 py-0.5 rounded border whitespace-nowrap shrink-0"
-                          style={{ backgroundColor: color.bg, borderColor: color.border }}
-                        >
-                          {labelInfo.child?.division || 'N/A'}
-                        </span>
+                      {/* ROW 1: Name + Time + Div badge */}
+                      <div className="label-row1 flex items-center justify-between gap-1 pl-3">
+                        <span className="label-name font-black text-xs uppercase truncate leading-none flex-1">{labelInfo.child?.name}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[10px] font-bold text-black leading-none">{lunchTime}</span>
+                          <span
+                            className="label-div-badge text-[9px] font-black px-1.5 py-0.5 rounded border whitespace-nowrap leading-none"
+                            style={{ backgroundColor: color.bg, borderColor: color.border }}
+                          >
+                            {labelInfo.child?.division || 'N/A'}
+                          </span>
+                        </div>
                       </div>
 
-                      {/* ROW 2: Dish Name + Time */}
-                      <div className="label-row2 flex items-center justify-between font-bold text-[11px] overflow-hidden pl-3 mt-0.5">
-                        <span className="truncate flex-1">
+                      {/* ROW 2 & 3: Menu Name */}
+                      <div className="label-dish pl-3 text-[10.5px] font-extrabold leading-tight text-black line-clamp-2 my-auto">
+                        <span>
                           {displayName}
                           {labelInfo.componentTotal > 1 && (
-                            <span className="text-gray-500 font-bold ml-1 text-[9px]">
+                            <span className="text-gray-600 font-bold ml-1 text-[9px]">
                               [{labelInfo.componentIndex}/{labelInfo.componentTotal}]
                             </span>
                           )}
-                          {isItemLarge && <span className="large-indicator text-[#d43b3b] font-black ml-1.5">( Lg )</span>}
-                          {' '}
-                          {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-muted-foreground ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}
+                          {isItemLarge && <span className="large-indicator text-[#d43b3b] font-black ml-1">( Lg )</span>}
+                          {labelInfo.totalQuantity > 1 && <span className="text-[9px] text-gray-500 ml-1">({labelInfo.itemNumber}/{labelInfo.totalQuantity})</span>}
                         </span>
-                        <span className="font-black shrink-0 ml-1 leading-none">{lunchTime}</span>
                       </div>
 
-                      {/* ROW 3: Icon + School Name + Delivery Location */}
-                      <div className="flex items-center gap-1 text-black font-bold pl-3 mt-1">
+                      {/* ROW 4: School Icon + School Name ONLY */}
+                      <div className="label-school-row flex items-center gap-1 text-black font-bold pl-3">
                         <span
                           className="shrink-0"
                           style={{ fontSize: '11px', lineHeight: 1, fontFamily: 'system-ui, -apple-system, sans-serif' }}
@@ -790,22 +796,20 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                         >
                           {schoolIconChar}
                         </span>
-                        <span className="label-school truncate flex-1" style={{ fontSize: '8.5px', lineHeight: 1 }}>
-                          {schoolName.toUpperCase()} {labelInfo.child?.delivery_location ? `- ${labelInfo.child.delivery_location.toUpperCase()}` : ''}
+                        <span className="label-school truncate font-bold text-[9px] leading-tight">
+                          {schoolName.toUpperCase()}
                         </span>
                       </div>
 
-                      {/* ROW 4: Route + Date (Black and larger) */}
-                      <div className="label-footer flex items-center justify-between text-black font-black pl-3 mt-auto text-[10px]">
-                        {(() => {
-                          const routeNumber = (labelInfo.child?.schools as any)?.school_routes?.[0]?.routes?.route_number || '';
-                          const stopOrder = (labelInfo.child?.schools as any)?.school_routes?.[0]?.stop_order || 0;
-                          let routeText = '';
-                          if (routeNumber) routeText += `Rt ${routeNumber}`;
-                          if (stopOrder > 0) routeText += (routeText ? ` - Stop ${stopOrder}` : `Stop ${stopOrder}`);
-                          return <span>{routeText}</span>;
-                        })()}
-                        <span className="text-black font-bold">{printDate}</span>
+                      {/* ROW 5: Route + Delivery Location + Date (No year) */}
+                      <div className="label-footer flex items-center justify-between text-black font-bold pl-3 text-[8.5px] leading-tight gap-1">
+                        <span className="shrink-0 font-black">{routeText}</span>
+                        {labelInfo.child?.delivery_location && (
+                          <span className="truncate text-[7.5px] font-semibold text-gray-800 text-center flex-1 px-1">
+                            {labelInfo.child.delivery_location.toUpperCase()}
+                          </span>
+                        )}
+                        <span className="shrink-0 font-black">{printDate}</span>
                       </div>
                     </div>
                   );

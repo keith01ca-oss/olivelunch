@@ -28,6 +28,8 @@ export default async function AdminOrdersPage({
         id, 
         name, 
         division,
+        lunch_time,
+        delivery_location,
         schools (
           id,
           name,

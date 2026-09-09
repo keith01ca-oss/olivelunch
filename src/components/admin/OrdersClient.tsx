@@ -49,6 +49,8 @@ interface Order {
     id: string; 
     name: string; 
     division: string;
+    lunch_time?: string | null;
+    delivery_location?: string | null;
     schools: {
       name: string;
       school_routes: {
@@ -340,29 +342,31 @@ export default function OrdersClient({
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
+          flex: 1;
         }
-        .date-text { font-size: 10.5px; font-weight: 900; color: #000; margin-left: 4px; flex-shrink: 0; }
-        .school-row { font-size: 10px; color: #000; text-overflow: ellipsis; overflow: hidden; justify-content: flex-start; margin-top: 2px; margin-bottom: 3px; font-weight: 700;}
-        .dish-row { font-size: 11.5px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; justify-content: flex-start; padding-top: 2px;}
         @media print { 
           .label { border: none; } 
           @page { margin: 0.5in 0.1875in; size: 8.5in 11in; } 
           .color-strip { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
-      </style></head><body><div class="page"><div class="grid">${labelItems.map(li => `
-        <div class="label">
+      </style></head><body><div class="page"><div class="grid">${labelItems.map(li => {
+        const schoolUpper = (li.school || '').toUpperCase();
+        const isCrossSchool = schoolUpper.includes('ECS') || schoolUpper.includes('RCS');
+        return `
+        <div class="label" style="display: flex; flex-direction: column; justify-content: space-between; padding: 0.08in 0.1in 0.08in 0.22in;">
           <div class="color-strip" style="background-color: ${li.divColor.border};"></div>
-          <div class="row">
-            <span class="main-text">
-              ${li.order.children?.division ? `<span class="div-badge" style="background-color: ${li.divColor.bg}; border-color: ${li.divColor.border}; color: ${li.divColor.text};">${li.order.children.division}</span>` : ''}
-              <span class="child-name">${li.order.children?.name || 'Unknown'}</span>
-            </span>
-            <span class="date-text">${formatLocalDate(li.order.order_date, {month: 'short', day: 'numeric', year: 'numeric'})}</span>
+          
+          <!-- LINE 1: Name, Time, Div -->
+          <div class="row" style="align-items: center;">
+            <span class="child-name" style="font-weight: 900; font-size: 11px; text-transform: uppercase;">${li.order.children?.name || 'Unknown'}</span>
+            <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: 4px;">
+              ${li.order.children?.lunch_time ? `<span style="font-size: 9.5px; font-weight: bold; color: #000;">${li.order.children.lunch_time}</span>` : ''}
+              ${li.order.children?.division ? `<span class="div-badge" style="background-color: ${li.divColor.bg}; border-color: ${li.divColor.border}; color: ${li.divColor.text}; font-size: 8.5px; padding: 0.5px 3.5px;">${li.order.children.division}</span>` : ''}
+            </div>
           </div>
-          <div class="row school-row">
-            <span style="font-weight: 900; color: #000;">${li.route ? `Route ${li.route}` : 'No Route'}</span>&nbsp;- ${li.school}
-          </div>
-          <div class="row dish-row">
+
+          <!-- LINES 2 & 3: Menu Name (up to 2 lines) -->
+          <div style="font-size: 10.5px; font-weight: 800; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin: auto 0;">
             ${li.item.quantity}x ${(() => {
               if (li.componentName) {
                 const suffix = li.componentTotal > 1 ? ` [${li.componentIndex}/${li.componentTotal}]` : '';
@@ -373,7 +377,20 @@ export default function OrdersClient({
               return displayName + (isLarge ? ' <span style="color: #d43b3b; font-weight: bold;">( Lg )</span>' : '');
             })()}
           </div>
-        </div>`).join('')}</div></div><script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script></body></html>`;
+
+          <!-- LINE 4: School Icon + School Name ONLY -->
+          <div style="font-size: 9.5px; font-weight: 800; color: #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${isCrossSchool ? '✚ ' : ''}${li.school}
+          </div>
+
+          <!-- LINE 5: Route, Delivery Location, Date (no year) -->
+          <div class="row" style="font-size: 8.5px; font-weight: 900; color: #000; justify-content: space-between; align-items: baseline; gap: 4px;">
+            <span style="flex-shrink: 0;">${li.route ? `Route ${li.route}` : 'No Route'}</span>
+            ${li.order.children?.delivery_location ? `<span style="font-size: 7.5px; font-weight: 700; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: center;">${li.order.children.delivery_location.toUpperCase()}</span>` : ''}
+            <span style="flex-shrink: 0;">${formatLocalDate(li.order.order_date, {month: 'short', day: 'numeric'})}</span>
+          </div>
+        </div>`;
+      }).join('')}</div></div><script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script></body></html>`;
     const win = window.open('', '_blank');
     if (win) { win.document.write(html); win.document.close(); }
   };

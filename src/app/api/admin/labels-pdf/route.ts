@@ -239,9 +239,9 @@ export async function GET(req: NextRequest) {
     return 0;
   });
 
-  // Format date
+  // Format date (month and day only, no year)
   const printDate = formatLocalDate(date, {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short', day: 'numeric',
   });
 
   // Build PDF
@@ -260,44 +260,65 @@ export async function GET(req: NextRequest) {
     const y = TOP_MARGIN + row * (LABEL_H + ROW_GAP);
 
     const stripW = 4;
-    const padL = 24; // Massive left padding to push column 1 right
-    const padT = 14; // Massive top padding to push row 1 down
-    const padR = 16; // Massive right padding to push column 3 left
+    const padL = 20; // Left padding to clear color strip
+    const padR = 12; // Right padding
     const textW = LABEL_W - padL - padR;
 
-    // Left color strip (pulled inward to x+12 and padded top/bottom)
+    // Left color strip
     doc.save();
     try {
-      doc.roundedRect(x + 12, y + padT, stripW, LABEL_H - (padT * 2), 2).fill(label.color);
+      doc.roundedRect(x + 10, y + 7, stripW, LABEL_H - 14, 2).fill(label.color);
     } catch { /* ignore color errors */ }
     doc.restore();
 
-    // ROW 1: Name + Division badge
+    // ========================================================
+    // LINE 1: Child Name (left), Lunch Time, Division Badge (right)
+    // ========================================================
+    const badgeW = 26;
+    const badgeH = 9;
+    const badgeX = x + LABEL_W - padR - badgeW;
+    const line1Y = y + 7.5;
+
+    // Division badge (far right)
+    doc.save()
+      .roundedRect(badgeX, line1Y - 1, badgeW, badgeH, 1.5)
+      .stroke(label.color)
+      .font('Helvetica-Bold')
+      .fontSize(6.5)
+      .fillColor('black')
+      .text(label.division, badgeX, line1Y + 0.5, { width: badgeW, align: 'center', lineBreak: false })
+      .restore();
+
+    // Lunch Time (immediately to the left of division badge)
+    const lunchTime = formatTimeWithAmPm(label.lunchTime);
+    const timeW = lunchTime ? 38 : 0;
+    const timeX = badgeX - timeW - 4;
+    if (lunchTime) {
+      doc.save()
+        .font('Helvetica-Bold')
+        .fontSize(6.5)
+        .fillColor('black')
+        .text(lunchTime, timeX, line1Y, { width: timeW, align: 'right', lineBreak: false })
+        .restore();
+    }
+
+    // Child Name (left of Time)
+    const nameMaxW = textW - badgeW - (timeW ? timeW + 8 : 4);
     doc.save()
       .font('Helvetica-Bold')
-      .fontSize(7.5) // slightly smaller to fit compressed width
+      .fontSize(7.5)
       .fillColor('black')
       .text(
         label.childName.toUpperCase(),
         x + padL,
-        y + padT,
-        { width: textW - 32, ellipsis: true, lineBreak: false }
+        line1Y,
+        { width: nameMaxW, ellipsis: true, lineBreak: false }
       )
       .restore();
 
-    // formatTimeWithAmPm is imported from @/lib/utils
-
-    // Division badge (right of name)
-    doc.save()
-      .roundedRect(x + LABEL_W - padR - 30, y + padT - 1, 30, 9, 1)
-      .stroke(label.color)
-      .font('Helvetica-Bold')
-      .fontSize(6)
-      .fillColor('black')
-      .text(label.division, x + LABEL_W - padR - 30, y + padT + 0.5, { width: 30, align: 'center', lineBreak: false })
-      .restore();
-
-    // ROW 2: Dish Name + Time
+    // ========================================================
+    // LINES 2 & 3: Menu Name (wrapped up to 2 lines)
+    // ========================================================
     let finalDishName = label.dishName;
     if (label.componentTotal > 1) {
       finalDishName += ` [${label.componentIndex}/${label.componentTotal}]`;
@@ -306,35 +327,40 @@ export async function GET(req: NextRequest) {
       ? `${finalDishName}  (${label.itemNum}/${label.totalQty})`
       : finalDishName;
 
-    const lunchTime = formatTimeWithAmPm(label.lunchTime);
-
+    const line2Y = y + 18.5;
     doc.save()
       .font('Helvetica-Bold')
-      .fontSize(7.5);
+      .fontSize(7.2);
 
     if (label.isLarge) {
       doc.fillColor('black')
-         .text(dishText + ' ', x + padL, y + padT + 11.5, { continued: true, width: textW - 40, ellipsis: true })
+         .text(dishText + ' ', x + padL, line2Y, {
+           width: textW,
+           height: 19,
+           lineGap: 1,
+           ellipsis: true,
+           continued: true
+         })
          .fillColor('#d43b3b') // red color
          .text('( Lg )');
     } else {
       doc.fillColor('black')
-         .text(dishText, x + padL, y + padT + 11.5, { width: textW - 25, ellipsis: true, lineBreak: false });
+         .text(dishText, x + padL, line2Y, {
+           width: textW,
+           height: 19,
+           lineGap: 1,
+           ellipsis: true
+         });
     }
     doc.restore();
 
-    doc.save()
-      .font('Helvetica-Bold')
-      .fontSize(6.5)
-      .fillColor('#222222')
-      .text(lunchTime, x + padL + textW - 35, y + padT + 12, { width: 35, align: 'right', lineBreak: false })
-      .restore();
-
-    // ROW 3: School icon (named, always black) + School name on same line
-    const symSz = 3.8;
+    // ========================================================
+    // LINE 4: School Icon + School Name ONLY
+    // ========================================================
+    const symSz = 3.5;
     const symCX = x + padL + symSz + 1;
-    const iconRowY = y + padT + 26;
-    const schoolIconW = symSz * 2 + 7;
+    const iconRowY = y + 42.5;
+    const schoolIconW = symSz * 2 + 5;
     const schoolNameW = textW - schoolIconW;
 
     // Shared helper: draw the correct sticker-matching icon shape in black
@@ -530,35 +556,57 @@ export async function GET(req: NextRequest) {
     }
     doc.restore();
 
-    // School Name + Delivery Location — same Y as icon, single line, no wrap
-    const schoolDelivText = label.deliveryLocation 
-      ? `${label.schoolName.toUpperCase()} - ${label.deliveryLocation.toUpperCase()}`
-      : label.schoolName.toUpperCase();
-
+    // ========================================================
+    // LINE 4: School Name ONLY
+    // ========================================================
     doc.save()
       .font('Helvetica-Bold')
       .fontSize(6.5)
       .fillColor('black')
       .text(
-        schoolDelivText,
+        label.schoolName.toUpperCase(),
         x + padL + schoolIconW, iconRowY - 3.2,
         { width: schoolNameW, ellipsis: true, lineBreak: false }
       )
       .restore();
 
-    // ROW 4: Route + Stop + Date (Black & Larger)
+    // ========================================================
+    // LINE 5: Route (left), Delivery Location (center), Date (right)
+    // ========================================================
     let routeText = '';
     if (label.routeNumber) routeText += `Rt ${label.routeNumber}`;
     if (label.stopOrder > 0) routeText += (routeText ? ` - Stop ${label.stopOrder}` : `Stop ${label.stopOrder}`);
 
-    const routeRowY = y + padT + 38;
+    const line5Y = y + 54;
     doc.save()
       .font('Helvetica-Bold')
-      .fontSize(7.5)
-      .fillColor('black')
-      .text(routeText, x + padL, routeRowY, { width: textW * 0.55, ellipsis: true, lineBreak: false })
-      .text(printDate, x + padL + textW * 0.55, routeRowY, { width: textW * 0.45, align: 'right', lineBreak: false })
-      .restore();
+      .fontSize(6)
+      .fillColor('black');
+
+    const routeW = routeText ? doc.widthOfString(routeText) + 4 : 0;
+    const dateW = printDate ? doc.widthOfString(printDate) + 4 : 0;
+    const midX = x + padL + routeW;
+    const midW = Math.max(0, textW - routeW - dateW);
+
+    if (routeText) {
+      doc.text(routeText, x + padL, line5Y, { width: routeW, ellipsis: true, lineBreak: false });
+    }
+
+    if (printDate) {
+      doc.text(printDate, x + LABEL_W - padR - dateW, line5Y, { width: dateW, align: 'right', lineBreak: false });
+    }
+
+    if (label.deliveryLocation && midW > 12) {
+      doc.fontSize(5)
+         .text(label.deliveryLocation.toUpperCase(), midX + 2, line5Y + 0.5, {
+           width: midW - 4,
+           align: 'center',
+           ellipsis: true,
+           lineBreak: false
+         });
+    }
+
+    doc.restore();
   };
 
   // Draw all labels
