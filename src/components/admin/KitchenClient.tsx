@@ -157,8 +157,8 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
       const school = (o.children?.schools as any)?.name || '';
       if (school && !(school in map)) {
         // Named schools get fixed icons so they never collide or change
-        if (school === 'ECS EC') {
-          map[school] = 'cross';     // cross sticker — reserved for ECS EC only
+        if (school.toUpperCase().includes('ECS') || school.toUpperCase().includes('RCS')) {
+          map[school] = 'cross';     // cross sticker — reserved for ECS and RCS
         } else if (school.toUpperCase().includes('WESTWIND')) {
           map[school] = 'wind';      // swirl sticker — reserved for any Westwind school
         } else {
@@ -424,11 +424,9 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
               text-transform: uppercase !important;
             }
 
-            /* Dashed separator */
+            /* Remove dashed divider */
             .avery-label .label-divider {
-              border: none !important;
-              border-top: 0.4pt dashed #777 !important;
-              margin: 2pt 0 !important;
+              display: none !important;
             }
 
             /* Dish name */
@@ -444,13 +442,13 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
               color: black !important;
             }
 
-            /* Footer: school + date */
+            /* Footer: route + date */
             .avery-label .label-footer {
               display: flex !important;
               justify-content: space-between !important;
-              font-size: 5.5pt !important;
-              font-weight: 500 !important;
-              color: #444 !important;
+              font-size: 7.5pt !important;
+              font-weight: 800 !important;
+              color: black !important;
               margin-top: auto !important;
               line-height: 1 !important;
             }
@@ -783,11 +781,8 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                         <span className="font-black shrink-0 ml-1 leading-none">{lunchTime}</span>
                       </div>
 
-                      {/* DIVIDER */}
-                      <div className="label-divider border-t border-dashed my-1" style={{ borderColor: color.border }} />
-
-                      {/* ROW 3: Icon + School Name + Delivery Location + Date */}
-                      <div className="label-footer flex items-center gap-1 text-black font-bold mt-auto pl-3">
+                      {/* ROW 3: Icon + School Name + Delivery Location */}
+                      <div className="flex items-center gap-1 text-black font-bold pl-3 mt-1">
                         <span
                           className="shrink-0"
                           style={{ fontSize: '11px', lineHeight: 1, fontFamily: 'system-ui, -apple-system, sans-serif' }}
@@ -795,10 +790,22 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                         >
                           {schoolIconChar}
                         </span>
-                        <span className="label-school truncate flex-1" style={{ fontSize: '8px', lineHeight: 1 }}>
+                        <span className="label-school truncate flex-1" style={{ fontSize: '8.5px', lineHeight: 1 }}>
                           {schoolName.toUpperCase()} {labelInfo.child?.delivery_location ? `- ${labelInfo.child.delivery_location.toUpperCase()}` : ''}
                         </span>
-                        <span className="shrink-0 text-slate-400 font-normal" style={{ fontSize: '7px', lineHeight: 1 }}>{printDate}</span>
+                      </div>
+
+                      {/* ROW 4: Route + Date (Black and larger) */}
+                      <div className="label-footer flex items-center justify-between text-black font-black pl-3 mt-auto text-[10px]">
+                        {(() => {
+                          const routeNumber = (labelInfo.child?.schools as any)?.school_routes?.[0]?.routes?.route_number || '';
+                          const stopOrder = (labelInfo.child?.schools as any)?.school_routes?.[0]?.stop_order || 0;
+                          let routeText = '';
+                          if (routeNumber) routeText += `Rt ${routeNumber}`;
+                          if (stopOrder > 0) routeText += (routeText ? ` - Stop ${stopOrder}` : `Stop ${stopOrder}`);
+                          return <span>{routeText}</span>;
+                        })()}
+                        <span className="text-black font-bold">{printDate}</span>
                       </div>
                     </div>
                   );

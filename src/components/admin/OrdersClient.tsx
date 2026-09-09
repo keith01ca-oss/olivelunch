@@ -341,9 +341,9 @@ export default function OrdersClient({
           overflow: hidden;
           white-space: nowrap;
         }
-        .date-text { font-size: 9px; font-weight: bold; color: #555; margin-left: 4px; flex-shrink: 0; }
-        .school-row { font-size: 9.5px; color: #333; text-overflow: ellipsis; overflow: hidden; justify-content: flex-start; margin-top: 2px; margin-bottom: 3px; font-weight: 600;}
-        .dish-row { font-size: 11.5px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; justify-content: flex-start; border-top: 1px solid #ddd; padding-top: 3px;}
+        .date-text { font-size: 10.5px; font-weight: 900; color: #000; margin-left: 4px; flex-shrink: 0; }
+        .school-row { font-size: 10px; color: #000; text-overflow: ellipsis; overflow: hidden; justify-content: flex-start; margin-top: 2px; margin-bottom: 3px; font-weight: 700;}
+        .dish-row { font-size: 11.5px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; justify-content: flex-start; padding-top: 2px;}
         @media print { 
           .label { border: none; } 
           @page { margin: 0.5in 0.1875in; size: 8.5in 11in; } 
@@ -357,10 +357,10 @@ export default function OrdersClient({
               ${li.order.children?.division ? `<span class="div-badge" style="background-color: ${li.divColor.bg}; border-color: ${li.divColor.border}; color: ${li.divColor.text};">${li.order.children.division}</span>` : ''}
               <span class="child-name">${li.order.children?.name || 'Unknown'}</span>
             </span>
-            <span class="date-text">${formatLocalDate(li.order.order_date, {month: 'short', day: 'numeric'})}</span>
+            <span class="date-text">${formatLocalDate(li.order.order_date, {month: 'short', day: 'numeric', year: 'numeric'})}</span>
           </div>
           <div class="row school-row">
-            ${li.route ? `Route ${li.route}` : 'No Route'} - ${li.school}
+            <span style="font-weight: 900; color: #000;">${li.route ? `Route ${li.route}` : 'No Route'}</span>&nbsp;- ${li.school}
           </div>
           <div class="row dish-row">
             ${li.item.quantity}x ${(() => {

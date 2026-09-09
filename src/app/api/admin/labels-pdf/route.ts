@@ -152,7 +152,7 @@ export async function GET(req: NextRequest) {
     const school = (o.children?.schools as any)?.name || '';
     if (school && !(school in schoolIconMap)) {
       const schoolUpper = school.toUpperCase();
-      if (schoolUpper === 'ECS EC' || schoolUpper === 'RCS EC') {
+      if (schoolUpper.includes('ECS') || schoolUpper.includes('RCS')) {
         schoolIconMap[school] = 'cross';
       } else if (schoolUpper.includes('WESTWIND')) {
         schoolIconMap[school] = 'wind';
@@ -330,22 +330,10 @@ export async function GET(req: NextRequest) {
       .text(lunchTime, x + padL + textW - 35, y + padT + 12, { width: 35, align: 'right', lineBreak: false })
       .restore();
 
-    // Dashed divider line
-    doc.save()
-      .moveTo(x + padL, y + padT + 22)
-      .lineTo(x + LABEL_W - padR, y + padT + 22)
-      .dash(2, { space: 2 })
-      .strokeColor('#888888')
-      .lineWidth(0.4)
-      .stroke()
-      .restore();
-
-
-
-    // ROW 4a: School icon (named, always black) + School name on same line
+    // ROW 3: School icon (named, always black) + School name on same line
     const symSz = 3.8;
     const symCX = x + padL + symSz + 1;
-    const iconRowY = y + LABEL_H - 24;
+    const iconRowY = y + padT + 26;
     const schoolIconW = symSz * 2 + 7;
     const schoolNameW = textW - schoolIconW;
 
@@ -549,7 +537,7 @@ export async function GET(req: NextRequest) {
 
     doc.save()
       .font('Helvetica-Bold')
-      .fontSize(6)
+      .fontSize(6.5)
       .fillColor('black')
       .text(
         schoolDelivText,
@@ -558,19 +546,18 @@ export async function GET(req: NextRequest) {
       )
       .restore();
 
-    // ROW 4b: Route + Stop + Date
+    // ROW 4: Route + Stop + Date (Black & Larger)
     let routeText = '';
     if (label.routeNumber) routeText += `Rt ${label.routeNumber}`;
     if (label.stopOrder > 0) routeText += (routeText ? ` - Stop ${label.stopOrder}` : `Stop ${label.stopOrder}`);
 
+    const routeRowY = y + padT + 38;
     doc.save()
       .font('Helvetica-Bold')
-      .fontSize(5)
-      .fillColor('#666666')
-      .text(routeText, x + padL, y + LABEL_H - 14, { width: textW * 0.6, ellipsis: true, lineBreak: false })
-      .fontSize(5)
-      .fillColor('#888888')
-      .text(printDate, x + padL + textW * 0.6, y + LABEL_H - 14, { width: textW * 0.4, align: 'right', lineBreak: false })
+      .fontSize(7.5)
+      .fillColor('black')
+      .text(routeText, x + padL, routeRowY, { width: textW * 0.55, ellipsis: true, lineBreak: false })
+      .text(printDate, x + padL + textW * 0.55, routeRowY, { width: textW * 0.45, align: 'right', lineBreak: false })
       .restore();
   };
 
