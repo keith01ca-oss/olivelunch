@@ -165,3 +165,348 @@ export async function sendReferralRewardEmail(email: string, name: string, refer
     console.error('Failed to send referral reward email:', error);
   }
 }
+
+/**
+ * Resolves notification email and whatsapp settings from the organization
+ */
+export async function getAdminNotificationConfig(orgId?: string) {
+  try {
+    let targetOrgId = orgId;
+    if (!targetOrgId) {
+      const { data: org } = await supabaseAdmin
+        .from('organizations')
+        .select('id, settings')
+        .eq('slug', 'olive-lunch')
+        .single();
+      if (org) {
+        return {
+          orgId: org.id,
+          email: org.settings?.order_notification_email || 'olivelunch.com@gmail.com',
+          whatsapp: org.settings?.order_notification_whatsapp || ''
+        };
+      }
+
+      const { data: anyOrg } = await supabaseAdmin
+        .from('organizations')
+        .select('id, settings')
+        .limit(1)
+        .single();
+      if (anyOrg) {
+        return {
+          orgId: anyOrg.id,
+          email: anyOrg.settings?.order_notification_email || 'olivelunch.com@gmail.com',
+          whatsapp: anyOrg.settings?.order_notification_whatsapp || ''
+        };
+      }
+
+      return {
+        orgId: null,
+        email: 'olivelunch.com@gmail.com',
+        whatsapp: ''
+      };
+    }
+
+    const { data: org } = await supabaseAdmin
+      .from('organizations')
+      .select('id, settings')
+      .eq('id', targetOrgId)
+      .single();
+
+    return {
+      orgId: targetOrgId,
+      email: org?.settings?.order_notification_email || 'olivelunch.com@gmail.com',
+      whatsapp: org?.settings?.order_notification_whatsapp || ''
+    };
+  } catch (e) {
+    console.warn('Failed to load admin notification config, using defaults:', e);
+    return {
+      orgId: null,
+      email: 'olivelunch.com@gmail.com',
+      whatsapp: ''
+    };
+  }
+}
+
+/**
+ * Sends an instant email notification to the admin when a new order is placed
+ */
+export async function sendAdminNewOrderNotification(orderIds: string[], orgId?: string) {
+  try {
+    if (!orderIds || orderIds.length === 0) return;
+
+    // Fetch order details including parent and items
+    const { data: orders, error } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        id, order_date, total_amount, credit_used, gross_amount, status, created_at, org_id,
+        parents ( id, name, email, phone ),
+        children (
+          name, division, delivery_location,
+          schools ( name )
+        ),
+        order_items (
+          quantity, unit_price, total_price, is_large,
+          dishes ( name, large_name )
+        )
+      `)
+      .in('id', orderIds)
+      .order('order_date', { ascending: true });
+
+    if (error || !orders || orders.length === 0) {
+      console.warn('sendAdminNewOrderNotification: No orders found for IDs', orderIds);
+      return;
+    }
+
+    const firstOrder = orders[0];
+    const parent = (firstOrder.parents as any);
+    const parentName = parent?.name || 'Customer';
+    const parentEmail = parent?.email || 'N/A';
+    const parentPhone = parent?.phone || '';
+    const cleanPhone = parentPhone.replace(/[^0-9]/g, '');
+    const waLink = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
+
+    const resolvedOrgId = orgId || firstOrder.org_id;
+    const config = await getAdminNotificationConfig(resolvedOrgId);
+
+    const totalCharged = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const totalCredit = orders.reduce((sum, o) => sum + Number(o.credit_used || 0), 0);
+    const totalGross = orders.reduce((sum, o) => sum + Number(o.gross_amount || 0), 0);
+
+    let itemsHtml = '';
+    for (const order of orders) {
+      const child = (order.children as any);
+      const childName = child?.name || 'Student';
+      const division = child?.division || '';
+      const schoolName = child?.schools?.name || '';
+      const orderDate = new Date(order.order_date + 'T00:00:00');
+      const formattedDate = format(orderDate, 'EEEE, MMM d, yyyy');
+
+      itemsHtml += `
+        <div style="margin-bottom: 16px; padding: 12px 16px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <div style="font-weight: bold; color: #0f172a; margin-bottom: 4px;">
+            ${childName} ${division ? `(Div: ${division})` : ''} - ${schoolName}
+          </div>
+          <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">Date: <strong>${formattedDate}</strong></div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      `;
+
+      for (const item of (order.order_items || [])) {
+        const dish = (item.dishes as any);
+        const dishName = item.is_large && dish?.large_name ? dish.large_name : dish?.name;
+        itemsHtml += `
+          <tr>
+            <td style="padding: 4px 0; color: #334155;"><strong>${item.quantity}x</strong> ${dishName}</td>
+            <td style="padding: 4px 0; text-align: right; color: #64748b;">$${Number(item.total_price || 0).toFixed(2)}</td>
+          </tr>
+        `;
+      }
+
+      itemsHtml += `</table></div>`;
+    }
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; background: #f8fafc; padding: 24px; border-radius: 12px;">
+        <div style="background: #15803d; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: bold;">🔔 New Order Received</h2>
+          <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Total Amount: <strong>$${totalCharged.toFixed(2)}</strong></div>
+        </div>
+
+        <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 15px; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Customer Details</h3>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Parent:</strong> ${parentName}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Email:</strong> <a href="mailto:${parentEmail}" style="color: #2563eb;">${parentEmail}</a></p>
+          <p style="margin: 4px 0; font-size: 14px;">
+            <strong>Phone:</strong> ${parentPhone || 'Not provided'}
+            ${waLink ? ` &bull; <a href="${waLink}" style="display: inline-block; background: #25D366; color: white; padding: 2px 8px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; margin-left: 6px;">WhatsApp Parent</a>` : ''}
+          </p>
+        </div>
+
+        <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 15px; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Meals Ordered</h3>
+        ${itemsHtml}
+
+        <div style="background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 16px;">
+          <table style="width: 100%; font-size: 14px;">
+            <tr>
+              <td style="padding: 3px 0; color: #64748b;">Subtotal:</td>
+              <td style="padding: 3px 0; text-align: right; font-weight: bold;">$${totalGross.toFixed(2)}</td>
+            </tr>
+            ${totalCredit > 0 ? `
+              <tr>
+                <td style="padding: 3px 0; color: #16a34a;">Store Credit:</td>
+                <td style="padding: 3px 0; text-align: right; color: #16a34a; font-weight: bold;">-$${totalCredit.toFixed(2)}</td>
+              </tr>
+            ` : ''}
+            <tr style="border-top: 1px solid #e2e8f0;">
+              <td style="padding: 8px 0 0 0; font-weight: bold; font-size: 16px; color: #0f172a;">Total Paid:</td>
+              <td style="padding: 8px 0 0 0; text-align: right; font-weight: bold; font-size: 16px; color: #15803d;">$${totalCharged.toFixed(2)}</td>
+            </tr>
+          </table>
+        </div>
+
+        <p style="margin-top: 24px; font-size: 12px; color: #94a3b8; text-align: center;">
+          Sent automatically to admin notification recipients &bull; Olive Lunch System
+        </p>
+      </div>
+    `;
+
+    const recipients: string[] = (config.email || 'olivelunch.com@gmail.com')
+      .split(/[,;]/)
+      .map((e: string) => e.trim())
+      .filter(Boolean);
+
+    await resend.emails.send({
+      from: 'Olive Lunch <orders@olivelunch.com>',
+      to: recipients.length > 0 ? recipients : ['olivelunch.com@gmail.com'],
+      subject: `🔔 New Order Placed: ${parentName} ($${totalCharged.toFixed(2)})`,
+      html
+    });
+  } catch (error) {
+    console.error('Failed to send admin new order notification email:', error);
+  }
+}
+
+/**
+ * Sends a summary of meal quantities for target date (day + 2 days).
+ * Rules:
+ * - Mon-Fri only (Saturday & Sunday skipped)
+ * - Only sent when there is at least 1 order for that day (0 orders skipped)
+ * - Subject: e.g. "sept 16 order summary"
+ * - Body: exact item quantities, e.g.:
+ *     2 x chicken nugget
+ *     1 x spring roll
+ */
+export async function sendDailyOrderSummaryEmail(options?: { targetDate?: string; orgId?: string; force?: boolean }) {
+  try {
+    const config = await getAdminNotificationConfig(options?.orgId);
+
+    // Determine target date (default: today in Pacific Time + 2 days)
+    let targetDateStr = options?.targetDate;
+    if (!targetDateStr) {
+      const now = new Date();
+      // Use Pacific Time (Vancouver)
+      const vancouverDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }); // YYYY-MM-DD
+      const [y, m, d] = vancouverDateStr.split('-').map(Number);
+      const localD = new Date(Date.UTC(y, m - 1, d));
+      localD.setUTCDate(localD.getUTCDate() + 2);
+      targetDateStr = localD.toISOString().slice(0, 10);
+    }
+
+    // Check day of the week
+    const [tY, tM, tD] = targetDateStr.split('-').map(Number);
+    const targetD = new Date(Date.UTC(tY, tM - 1, tD));
+    const dayOfWeek = targetD.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    // Rule: Mon-Fri orders only (weekend no need)
+    if (isWeekend && !options?.force) {
+      console.log(`Daily order summary: Target date ${targetDateStr} is weekend (day ${dayOfWeek}). Skipping summary.`);
+      return {
+        success: true,
+        skipped: true,
+        targetDate: targetDateStr,
+        reason: `Target date ${targetDateStr} is a weekend (Mon-Fri only)`
+      };
+    }
+
+    // Query paid orders for target date
+    let query = supabaseAdmin
+      .from('orders')
+      .select(`
+        id,
+        order_items (
+          quantity,
+          is_large,
+          dishes ( name, large_name )
+        )
+      `)
+      .eq('order_date', targetDateStr)
+      .eq('status', 'paid');
+
+    if (config.orgId) {
+      query = query.eq('org_id', config.orgId);
+    }
+
+    const { data: orders, error } = await query;
+    if (error) throw error;
+
+    // Aggregate dish quantities
+    const itemCounts: Record<string, number> = {};
+    let totalItemsCount = 0;
+
+    for (const order of orders || []) {
+      for (const item of (order.order_items || [])) {
+        const dish = (item.dishes as any);
+        const dishName = item.is_large && dish?.large_name ? dish.large_name : (dish?.name || 'Unknown Item');
+        const qty = Number(item.quantity) || 1;
+        itemCounts[dishName] = (itemCounts[dishName] || 0) + qty;
+        totalItemsCount += qty;
+      }
+    }
+
+    // Rule: Only send when there is an order on that day; days with 0 orders do not send
+    if (totalItemsCount === 0 && !options?.force) {
+      console.log(`Daily order summary: 0 orders for ${targetDateStr}. Skipping email.`);
+      return {
+        success: true,
+        skipped: true,
+        targetDate: targetDateStr,
+        reason: `No orders for ${targetDateStr}`
+      };
+    }
+
+    // Format subject: e.g. "sept 16 order summary"
+    // Using UTC date components to avoid timezone shifting
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sept', 'oct', 'nov', 'dec'];
+    const subject = `${monthNames[tM - 1]} ${tD} order summary`;
+
+    // Format plain text lines:
+    // e.g.:
+    // 2 x chicken nugget
+    // 1 x spring roll
+    const lines = Object.entries(itemCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => `${count} x ${name}`);
+
+    const plainText = lines.length > 0 ? lines.join('\n') : '0 orders';
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;">
+        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0f172a; text-transform: capitalize;">${subject}</h2>
+        <div style="font-family: Consolas, 'Courier New', monospace; font-size: 16px; line-height: 1.8; background: #f8fafc; padding: 18px; border-radius: 8px; border: 1px solid #e2e8f0; color: #0f172a;">
+          ${lines.map(l => `<div>${l}</div>`).join('')}
+        </div>
+        <p style="margin-top: 18px; font-size: 13px; color: #64748b;">
+          Total Items: <strong>${totalItemsCount}</strong> &bull; Total Orders: <strong>${orders?.length || 0}</strong>
+        </p>
+      </div>
+    `;
+
+    const recipients: string[] = (config.email || 'olivelunch.com@gmail.com')
+      .split(/[,;]/)
+      .map((e: string) => e.trim())
+      .filter(Boolean);
+
+    await resend.emails.send({
+      from: 'Olive Lunch <orders@olivelunch.com>',
+      to: recipients.length > 0 ? recipients : ['olivelunch.com@gmail.com'],
+      subject,
+      text: plainText,
+      html: htmlBody
+    });
+
+    console.log(`Daily order summary sent for ${targetDateStr}: ${totalItemsCount} items to ${recipients.join(', ')}`);
+
+    return {
+      success: true,
+      skipped: false,
+      targetDate: targetDateStr,
+      totalItems: totalItemsCount,
+      summary: plainText,
+      recipients
+    };
+  } catch (error: any) {
+    console.error('Failed to send daily order summary email:', error);
+    return { success: false, error: error.message };
+  }
+}
+

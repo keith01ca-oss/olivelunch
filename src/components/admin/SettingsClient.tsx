@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { 
   Settings, Plus, Trash2, Save, Loader2, Phone, Mail, Sun, Gift,
-  Megaphone, MessageSquare, CheckCircle
+  Megaphone, MessageSquare, CheckCircle, Bell, Send
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { saveDashboardMessages, deleteSuggestion } from '@/app/admin/settings/actions';
@@ -28,7 +28,10 @@ export default function SettingsClient({
   const [contactPhone, setContactPhone] = useState<string>(org?.settings?.contact_phone || '');
   const [contactEmail, setContactEmail] = useState<string>(org?.settings?.contact_email || '');
   const [contactWhatsapp, setContactWhatsapp] = useState<string>(org?.settings?.contact_whatsapp || '');
+  const [orderNotificationEmail, setOrderNotificationEmail] = useState<string>(org?.settings?.order_notification_email || 'olivelunch.com@gmail.com');
+  const [orderNotificationWhatsapp, setOrderNotificationWhatsapp] = useState<string>(org?.settings?.order_notification_whatsapp || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [isTestingSummary, setIsTestingSummary] = useState(false);
   const [summerAction, setSummerAction] = useState<'apply' | null>(null);
   const [summerResult, setSummerResult] = useState<string | null>(null);
 
@@ -41,6 +44,31 @@ export default function SettingsClient({
   const [isDeletingSuggestion, setIsDeletingSuggestion] = useState<string | null>(null);
   const [isResolvingMessage, setIsResolvingMessage] = useState<string | null>(null);
 
+  const handleTestSummary = async () => {
+    setIsTestingSummary(true);
+    try {
+      const res = await fetch('/api/admin/test-daily-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to trigger daily summary');
+      }
+
+      if (data.skipped) {
+        toast.info(`Summary check: ${data.reason}`);
+      } else {
+        toast.success(`Daily summary email sent for ${data.targetDate}! (${data.totalItems} items to ${data.recipients?.join(', ')})`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to test summary report');
+    } finally {
+      setIsTestingSummary(false);
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -50,7 +78,9 @@ export default function SettingsClient({
         units: units.filter(u => u.trim() !== '').map(u => u.trim()),
         contact_phone: contactPhone.trim(),
         contact_email: contactEmail.trim(),
-        contact_whatsapp: contactWhatsapp.trim()
+        contact_whatsapp: contactWhatsapp.trim(),
+        order_notification_email: orderNotificationEmail.trim(),
+        order_notification_whatsapp: orderNotificationWhatsapp.trim()
       };
 
       const res = await fetch(`/api/admin/orgs/${org.id}`, {
@@ -324,6 +354,74 @@ export default function SettingsClient({
                   className="w-full h-10 rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background font-medium"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Order Notifications & Daily Reports */}
+          <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="border-b pb-2 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-slate-800 uppercase tracking-wider text-sm flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-primary" /> Order Notifications & 2-Day Daily Summary
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Configure where new order placement notices and 2-day daily order summaries (12:00 AM for Day + 2) are sent.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleTestSummary}
+                disabled={isTestingSummary}
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl border bg-muted/60 hover:bg-muted text-foreground transition-all disabled:opacity-50"
+              >
+                {isTestingSummary ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-primary" />}
+                Send Test 2-Day Summary Now
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5" /> Order Notification Email(s)
+                </label>
+                <input
+                  value={orderNotificationEmail}
+                  onChange={e => setOrderNotificationEmail(e.target.value)}
+                  placeholder="olivelunch.com@gmail.com"
+                  type="text"
+                  className="w-full h-10 rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background font-medium"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Defaults to <span className="font-semibold text-foreground">olivelunch.com@gmail.com</span>. Separate multiple emails with commas.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current text-green-600"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  Admin Alert WhatsApp Number
+                </label>
+                <input
+                  value={orderNotificationWhatsapp}
+                  onChange={e => setOrderNotificationWhatsapp(e.target.value)}
+                  placeholder="e.g. +16041234567"
+                  className="w-full h-10 rounded-lg border px-3 text-sm focus:ring-1 focus:ring-primary outline-none bg-background font-medium"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Stored for admin WhatsApp alerts and quick communication.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-muted/40 rounded-2xl p-4 border border-dashed text-xs text-muted-foreground space-y-1">
+              <p className="font-bold text-foreground flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Automated Schedule & Rules:
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 ml-1">
+                <li><strong>Mon–Fri orders only:</strong> Weekend days (Saturday & Sunday) are automatically skipped.</li>
+                <li><strong>No empty emails:</strong> If a target day has 0 orders, no email is sent.</li>
+                <li><strong>Format:</strong> Strictly item totals, e.g. <code>2 x chicken nugget</code>.</li>
+              </ul>
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase';
-import { sendOrderConfirmationEmail, sendVipActivationEmail, sendVipCancellationEmail, sendReferralRewardEmail } from '@/lib/email';
+import { sendOrderConfirmationEmail, sendAdminNewOrderNotification, sendVipActivationEmail, sendVipCancellationEmail, sendReferralRewardEmail } from '@/lib/email';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16' as any, // fallback to standard
@@ -269,6 +269,7 @@ export async function POST(req: NextRequest) {
 
             if (parent) {
               await sendOrderConfirmationEmail(parent.email, parent.name, orders.map(o => o.id));
+              await sendAdminNewOrderNotification(orders.map(o => o.id), (orders[0] as any)?.org_id);
             }
           }
         }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedParent, getOrResolveOrgId } from '@/lib/auth';
-import { sendOrderConfirmationEmail } from '@/lib/email';
+import { sendOrderConfirmationEmail, sendAdminNewOrderNotification } from '@/lib/email';
 import { supabaseAdmin } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 import Stripe from 'stripe';
@@ -304,6 +304,7 @@ export async function POST(req: NextRequest) {
       const { data: parent } = await supabaseAdmin.from('parents').select('*').eq('id', parentId).single();
       if (parent) {
         await sendOrderConfirmationEmail(parent.email, parent.name, insertedOrders.map(o => o.id));
+        await sendAdminNewOrderNotification(insertedOrders.map(o => o.id), orgId);
       }
 
       return NextResponse.json({ success: true, stripe_url: null });
