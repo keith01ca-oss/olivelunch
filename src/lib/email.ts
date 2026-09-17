@@ -176,8 +176,9 @@ export async function getAdminNotificationConfig(orgId?: string) {
       const { data: org } = await supabaseAdmin
         .from('organizations')
         .select('id, settings')
-        .eq('slug', 'olive-lunch')
-        .single();
+        .in('slug', ['olive-lunch', 'olivelunch'])
+        .limit(1)
+        .maybeSingle();
       if (org) {
         return {
           orgId: org.id,

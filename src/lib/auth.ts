@@ -18,8 +18,9 @@ export async function getOrResolveOrgId(): Promise<string> {
   const { data: org } = await supabaseAdmin
     .from('organizations')
     .select('id')
-    .eq('slug', 'olive-lunch')
-    .single();
+    .in('slug', ['olive-lunch', 'olivelunch'])
+    .limit(1)
+    .maybeSingle();
 
   if (org) {
     return org.id;
