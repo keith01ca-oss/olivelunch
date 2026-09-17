@@ -420,7 +420,7 @@ export default function SettingsClient({
               <ul className="list-disc list-inside space-y-0.5 ml-1">
                 <li><strong>Schedule:</strong> Mon night &rarr; Wed, Tue night &rarr; Thu, Wed night &rarr; Fri, Thu night &rarr; Mon, Fri night &rarr; Tue.</li>
                 <li><strong>Weekends off:</strong> Saturday & Sunday nights do not send summaries.</li>
-                <li><strong>No empty emails:</strong> If a target day has 0 orders, no email is sent.</li>
+                <li><strong>Zero orders:</strong> If a scheduled day has no orders, notice is still sent with title <code>[date] no order</code> and content <code>no order</code>.</li>
                 <li><strong>Format:</strong> Strictly item totals, e.g. <code>2 x chicken nugget</code>.</li>
               </ul>
             </div>

@@ -508,31 +508,24 @@ export async function sendDailyOrderSummaryEmail(options?: { targetDate?: string
       }
     }
 
-    // Rule: Only send when there is an order on that day; days with 0 orders do not send
-    if (totalItemsCount === 0 && !options?.force) {
-      console.log(`Daily order summary: 0 orders for ${targetDateStr}. Skipping email.`);
-      return {
-        success: true,
-        skipped: true,
-        targetDate: targetDateStr,
-        reason: `No orders for ${targetDateStr}`
-      };
-    }
-
-    // Format subject: e.g. "sept 16 order summary"
-    // Using UTC date components to avoid timezone shifting
     const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sept', 'oct', 'nov', 'dec'];
-    const subject = `${monthNames[tM - 1]} ${tD} order summary`;
+    const hasOrders = totalItemsCount > 0;
+    const subject = hasOrders 
+      ? `${monthNames[tM - 1]} ${tD} order summary` 
+      : `${monthNames[tM - 1]} ${tD} no order`;
 
     // Format plain text lines:
     // e.g.:
     // 2 x chicken nugget
     // 1 x spring roll
-    const lines = Object.entries(itemCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => `${count} x ${name}`);
+    // or: "no order"
+    const lines = hasOrders
+      ? Object.entries(itemCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, count]) => `${count} x ${name}`)
+      : ['no order'];
 
-    const plainText = lines.length > 0 ? lines.join('\n') : '0 orders';
+    const plainText = lines.join('\n');
 
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;">
