@@ -367,11 +367,71 @@ export async function sendAdminNewOrderNotification(orderIds: string[], orgId?: 
 }
 
 /**
- * Sends a summary of meal quantities for target date (day + 2 days).
+ * Calculates the target order date for the daily summary based on the kitchen schedule:
+ * - Monday night (Tuesday 12am) -> Wednesday orders
+ * - Tuesday night (Wednesday 12am) -> Thursday orders
+ * - Wednesday night (Thursday 12am) -> Friday orders
+ * - Thursday night (Friday 12am) -> Monday orders
+ * - Friday night (Saturday 12am) -> Tuesday orders
+ * - Saturday & Sunday nights -> Skipped
+ */
+export function calculateSummaryTargetDate(now: Date = new Date()): { targetDateStr: string; skipped: boolean; reason?: string } {
+  const vancouverDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }); // YYYY-MM-DD
+  const vancouverTimeStr = now.toLocaleTimeString('en-GB', { timeZone: 'America/Vancouver', hour12: false }); // HH:MM:SS
+  const [y, m, d] = vancouverDateStr.split('-').map(Number);
+  const hour = parseInt(vancouverTimeStr.split(':')[0], 10);
+
+  const localD = new Date(Date.UTC(y, m - 1, d));
+  const dayOfWeek = localD.getUTCDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+
+  let offsetDays = 0;
+  let skip = false;
+
+  // At midnight cron execution (hour < 12)
+  if (hour < 12) {
+    if (dayOfWeek === 2) offsetDays = 1; // Tue 12am (Mon night) -> Wed
+    else if (dayOfWeek === 3) offsetDays = 1; // Wed 12am (Tue night) -> Thu
+    else if (dayOfWeek === 4) offsetDays = 1; // Thu 12am (Wed night) -> Fri
+    else if (dayOfWeek === 5) offsetDays = 3; // Fri 12am (Thu night) -> Mon
+    else if (dayOfWeek === 6) offsetDays = 3; // Sat 12am (Fri night) -> Tue
+    else skip = true; // Sun 12am (Sat night) & Mon 12am (Sun night) -> Skip
+  } else {
+    // Afternoon / evening execution (e.g. testing from admin panel)
+    if (dayOfWeek === 1) offsetDays = 2; // Mon -> Wed
+    else if (dayOfWeek === 2) offsetDays = 2; // Tue -> Thu
+    else if (dayOfWeek === 3) offsetDays = 2; // Wed -> Fri
+    else if (dayOfWeek === 4) offsetDays = 4; // Thu -> Mon
+    else if (dayOfWeek === 5) offsetDays = 4; // Fri -> Tue
+    else skip = true; // Sat & Sun -> Skip
+  }
+
+  if (skip) {
+    return {
+      targetDateStr: vancouverDateStr,
+      skipped: true,
+      reason: 'No summary scheduled for weekend runs (Mon->Wed, Tue->Thu, Wed->Fri, Thu->Mon, Fri->Tue)'
+    };
+  }
+
+  localD.setUTCDate(localD.getUTCDate() + offsetDays);
+  return {
+    targetDateStr: localD.toISOString().slice(0, 10),
+    skipped: false
+  };
+}
+
+/**
+ * Sends a summary of meal quantities for target date.
+ * Kitchen Schedule:
+ * - Monday sends Wednesday
+ * - Tuesday sends Thursday
+ * - Wednesday sends Friday
+ * - Thursday sends Monday
+ * - Friday sends Tuesday
+ * - Saturday & Sunday skipped
  * Rules:
- * - Mon-Fri only (Saturday & Sunday skipped)
  * - Only sent when there is at least 1 order for that day (0 orders skipped)
- * - Subject: e.g. "sept 16 order summary"
+ * - Subject: e.g. "sept 18 order summary"
  * - Body: exact item quantities, e.g.:
  *     2 x chicken nugget
  *     1 x spring roll
@@ -380,16 +440,20 @@ export async function sendDailyOrderSummaryEmail(options?: { targetDate?: string
   try {
     const config = await getAdminNotificationConfig(options?.orgId);
 
-    // Determine target date (default: today in Pacific Time + 2 days)
+    // Determine target date using schedule if not explicitly provided
     let targetDateStr = options?.targetDate;
     if (!targetDateStr) {
-      const now = new Date();
-      // Use Pacific Time (Vancouver)
-      const vancouverDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }); // YYYY-MM-DD
-      const [y, m, d] = vancouverDateStr.split('-').map(Number);
-      const localD = new Date(Date.UTC(y, m - 1, d));
-      localD.setUTCDate(localD.getUTCDate() + 2);
-      targetDateStr = localD.toISOString().slice(0, 10);
+      const targetInfo = calculateSummaryTargetDate();
+      if (targetInfo.skipped && !options?.force) {
+        console.log(`Daily order summary: ${targetInfo.reason}. Skipping.`);
+        return {
+          success: true,
+          skipped: true,
+          targetDate: targetInfo.targetDateStr,
+          reason: targetInfo.reason
+        };
+      }
+      targetDateStr = targetInfo.targetDateStr;
     }
 
     // Check day of the week

@@ -362,10 +362,10 @@ export default function SettingsClient({
             <div className="border-b pb-2 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <h2 className="font-bold text-slate-800 uppercase tracking-wider text-sm flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-primary" /> Order Notifications & 2-Day Daily Summary
+                  <Bell className="w-4 h-4 text-primary" /> Order Notifications & Daily Kitchen Summary
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Configure where new order placement notices and 2-day daily order summaries (12:00 AM for Day + 2) are sent.
+                  Configure where new order placement notices and daily order summaries are sent (Monday sends Wednesday, Tuesday sends Thursday, Wednesday sends Friday, Thursday sends Monday, Friday sends Tuesday).
                 </p>
               </div>
               <button
@@ -375,7 +375,7 @@ export default function SettingsClient({
                 className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl border bg-muted/60 hover:bg-muted text-foreground transition-all disabled:opacity-50"
               >
                 {isTestingSummary ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-primary" />}
-                Send Test 2-Day Summary Now
+                Send Test Summary Now
               </button>
             </div>
 
@@ -415,10 +415,11 @@ export default function SettingsClient({
 
             <div className="bg-muted/40 rounded-2xl p-4 border border-dashed text-xs text-muted-foreground space-y-1">
               <p className="font-bold text-foreground flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Automated Schedule & Rules:
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Kitchen Schedule & Rules:
               </p>
               <ul className="list-disc list-inside space-y-0.5 ml-1">
-                <li><strong>Mon–Fri orders only:</strong> Weekend days (Saturday & Sunday) are automatically skipped.</li>
+                <li><strong>Schedule:</strong> Mon night &rarr; Wed, Tue night &rarr; Thu, Wed night &rarr; Fri, Thu night &rarr; Mon, Fri night &rarr; Tue.</li>
+                <li><strong>Weekends off:</strong> Saturday & Sunday nights do not send summaries.</li>
                 <li><strong>No empty emails:</strong> If a target day has 0 orders, no email is sent.</li>
                 <li><strong>Format:</strong> Strictly item totals, e.g. <code>2 x chicken nugget</code>.</li>
               </ul>
