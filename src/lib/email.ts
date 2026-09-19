@@ -172,6 +172,7 @@ export async function sendReferralRewardEmail(email: string, name: string, refer
 export async function getAdminNotificationConfig(orgId?: string) {
   try {
     let targetOrgId = orgId;
+    const defaultAdminEmail = 'olivelunch.com@gmail.com, keith01.ca@gmail.com';
     if (!targetOrgId) {
       const { data: org } = await supabaseAdmin
         .from('organizations')
@@ -182,7 +183,7 @@ export async function getAdminNotificationConfig(orgId?: string) {
       if (org) {
         return {
           orgId: org.id,
-          email: org.settings?.order_notification_email || 'olivelunch.com@gmail.com',
+          email: org.settings?.order_notification_email || defaultAdminEmail,
           whatsapp: org.settings?.order_notification_whatsapp || ''
         };
       }
@@ -195,14 +196,14 @@ export async function getAdminNotificationConfig(orgId?: string) {
       if (anyOrg) {
         return {
           orgId: anyOrg.id,
-          email: anyOrg.settings?.order_notification_email || 'olivelunch.com@gmail.com',
+          email: anyOrg.settings?.order_notification_email || defaultAdminEmail,
           whatsapp: anyOrg.settings?.order_notification_whatsapp || ''
         };
       }
 
       return {
         orgId: null,
-        email: 'olivelunch.com@gmail.com',
+        email: defaultAdminEmail,
         whatsapp: ''
       };
     }
@@ -215,14 +216,14 @@ export async function getAdminNotificationConfig(orgId?: string) {
 
     return {
       orgId: targetOrgId,
-      email: org?.settings?.order_notification_email || 'olivelunch.com@gmail.com',
+      email: org?.settings?.order_notification_email || defaultAdminEmail,
       whatsapp: org?.settings?.order_notification_whatsapp || ''
     };
   } catch (e) {
     console.warn('Failed to load admin notification config, using defaults:', e);
     return {
       orgId: null,
-      email: 'olivelunch.com@gmail.com',
+      email: 'olivelunch.com@gmail.com, keith01.ca@gmail.com',
       whatsapp: ''
     };
   }
@@ -389,27 +390,30 @@ export function calculateSummaryTargetDate(now: Date = new Date()): { targetDate
 
   // At midnight cron execution (hour < 12)
   if (hour < 12) {
-    if (dayOfWeek === 2) offsetDays = 1; // Tue 12am (Mon night) -> Wed
+    if (dayOfWeek === 1) offsetDays = 0; // Mon 12am (Sun night) -> Mon orders (final summary after weekend cutoff)
+    else if (dayOfWeek === 2) offsetDays = 1; // Tue 12am (Mon night) -> Wed
     else if (dayOfWeek === 3) offsetDays = 1; // Wed 12am (Tue night) -> Thu
     else if (dayOfWeek === 4) offsetDays = 1; // Thu 12am (Wed night) -> Fri
     else if (dayOfWeek === 5) offsetDays = 3; // Fri 12am (Thu night) -> Mon
     else if (dayOfWeek === 6) offsetDays = 3; // Sat 12am (Fri night) -> Tue
-    else skip = true; // Sun 12am (Sat night) & Mon 12am (Sun night) -> Skip
+    else skip = true; // Sun 12am (Sat night) -> Skip
   } else {
     // Afternoon / evening execution (e.g. testing from admin panel)
-    if (dayOfWeek === 1) offsetDays = 2; // Mon -> Wed
+    if (dayOfWeek === 0) offsetDays = 1; // Sun -> Mon
+    else if (dayOfWeek === 1) offsetDays = 2; // Mon -> Wed
     else if (dayOfWeek === 2) offsetDays = 2; // Tue -> Thu
     else if (dayOfWeek === 3) offsetDays = 2; // Wed -> Fri
     else if (dayOfWeek === 4) offsetDays = 4; // Thu -> Mon
     else if (dayOfWeek === 5) offsetDays = 4; // Fri -> Tue
-    else skip = true; // Sat & Sun -> Skip
+    else if (dayOfWeek === 6) offsetDays = 2; // Sat -> Mon
+    else skip = true;
   }
 
   if (skip) {
     return {
       targetDateStr: vancouverDateStr,
       skipped: true,
-      reason: 'No summary scheduled for weekend runs (Mon->Wed, Tue->Thu, Wed->Fri, Thu->Mon, Fri->Tue)'
+      reason: 'No summary scheduled for Saturday night run'
     };
   }
 
