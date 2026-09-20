@@ -5,7 +5,7 @@ import { getOrResolveOrgId } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function KitchenPrepPage({ searchParams }: { searchParams: { date?: string, tab?: string } }) {
+export default async function KitchenPrepPage({ searchParams }: { searchParams: { date?: string, endDate?: string, tab?: string } }) {
   const orgId = await getOrResolveOrgId();
 
   // Fetch dishes for mapping
@@ -22,7 +22,12 @@ export default async function KitchenPrepPage({ searchParams }: { searchParams: 
         <p className="text-muted-foreground mt-1">Calculate daily meal and ingredient totals.</p>
       </div>
       
-      <KitchenClient initialDishes={dishes || []} initialDate={searchParams.date} initialTab={searchParams.tab as any} />
+      <KitchenClient
+        initialDishes={dishes || []}
+        initialDate={searchParams.date}
+        initialEndDate={searchParams.endDate}
+        initialTab={searchParams.tab as any}
+      />
     </div>
   );
 }

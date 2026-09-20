@@ -102,13 +102,22 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
         const parsed = JSON.parse(saved);
         // Clean up cart on load: remove days that were PAID for, so the cart
         // doesn't show stale items after a successful checkout.
-        // NOTE: existingOrders only contains 'paid' orders (pending/cancelled Stripe
-        // sessions are NOT included), so cancelled checkouts won't wipe the cart.
+        // Clean up cart on load: remove days that were PAID for, so the cart
+        // doesn't show stale items after a successful checkout.
         const childOrders = existingOrders.filter(o => o.child_id === selectedChildId);
         let hasChanges = false;
         childOrders.forEach(order => {
           if (parsed[order.order_date]) {
             delete parsed[order.order_date];
+            hasChanges = true;
+          }
+        });
+        // Also prune any blocked/holiday dates that might have been saved in cart
+        Object.keys(parsed).forEach(dateStr => {
+          const isBlocked = blockedDates.some((b: any) => b.date === dateStr);
+          const isProd = prodDates.some((p: any) => dateStr >= p.start_date && dateStr <= p.end_date);
+          if (isBlocked || isProd) {
+            delete parsed[dateStr];
             hasChanges = true;
           }
         });
@@ -118,7 +127,7 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
       else setCart({});
     } catch (e) { console.error('Failed to load cart', e); }
     setIsLoaded(true);
-  }, [selectedChildId, existingOrders]);
+  }, [selectedChildId, existingOrders, blockedDates, prodDates]);
 
   // Save Cart
   useEffect(() => {
@@ -139,6 +148,7 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
     if (isBefore(date, minSelectableDate)) return true;
     const dateKey = format(date, 'yyyy-MM-dd');
     if (blockedDates.some((b: any) => b.date === dateKey)) return true;
+    if (prodDates.some((p: any) => dateKey >= p.start_date && dateKey <= p.end_date)) return true;
     return false;
   };
 
@@ -479,6 +489,18 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
 
   const handleCheckout = async () => {
     if (totalItems === 0 || isCheckingOut) return;
+
+    // Pre-check for any blocked/holiday dates before checkout
+    for (const date of Object.keys(cart)) {
+      const blockedInfo = blockedDates.find((b: any) => b.date === date);
+      const prodInfo = prodDates.find((p: any) => date >= p.start_date && date <= p.end_date);
+      const reason = blockedInfo?.reason || prodInfo?.message;
+      if (reason) {
+        alert(`Orders are closed on ${date}: ${reason}. Please remove it from your cart.`);
+        return;
+      }
+    }
+
     setIsCheckingOut(true);
     try {
       const ordersArray = Object.keys(cart).map(date => ({
@@ -543,17 +565,21 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
 
     return (
       <div className={`rounded-xl border-2 transition-all flex flex-col ${
+        blockReason ? 'border-red-300 bg-red-50/20' :
         isDisabled ? 'opacity-40 bg-muted/30 border-border cursor-not-allowed' :
         isSelected ? 'border-primary bg-primary/5 shadow-sm' : 
         hasExisting ? 'border-green-400 bg-green-50/30' : 'border-border bg-card hover:border-primary/40'
       }`}>
         {/* Day Header - always visible */}
         <div
-          className={`flex items-center justify-between p-3 rounded-t-xl font-bold text-base cursor-pointer ${
+          className={`flex items-center justify-between p-3 rounded-t-xl font-bold text-base ${
+            blockReason ? 'bg-red-100/50 cursor-not-allowed' :
+            isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
+          } ${
             isSelected ? 'bg-primary/10' : hasExisting ? 'bg-green-100/50' : ''
           } ${isMobile ? 'rounded-b-xl' : ''} ${isMobile && isExpanded ? 'rounded-b-none border-b' : ''}`}
           onClick={() => {
-            if (isDisabled) return;
+            if (isDisabled || blockReason) return;
             if (isMobile) {
               toggleExpanded(dateKey, weekDays);
             } else {
@@ -561,9 +587,17 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
             }
           }}
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <span className="text-foreground shrink-0">{format(day, 'd EEE')}</span>
-            {(() => {
+
+            {/* If blocked, show clear holiday badge in header */}
+            {blockReason && (
+              <span className="text-xs bg-red-100 border border-red-200 text-red-700 px-2 py-0.5 rounded-md font-bold truncate">
+                🚫 {blockReason}
+              </span>
+            )}
+
+            {!blockReason && (() => {
               const dayMains = getScheduledDishesForCategory(dateKey, 'main');
               const daySides = getScheduledDishesForCategory(dateKey, 'side');
               const daySnacks = getScheduledDishesForCategory(dateKey, 'snack');
@@ -591,7 +625,7 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
               );
             })()}
             {/* Mobile collapsed summary */}
-            {isMobile && !isExpanded && isSelected && (() => {
+            {isMobile && !isExpanded && isSelected && !blockReason && (() => {
               const allInCart = Object.keys(dayCart)
                 .map(id => dishes.find(d => d.id === id))
                 .filter(Boolean);
@@ -611,11 +645,8 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
                 </span>
               );
             })()}
-            {isMobile && !isExpanded && !isSelected && hasExisting && (
+            {isMobile && !isExpanded && !isSelected && hasExisting && !blockReason && (
               <span className="text-xs text-green-700 font-bold truncate flex-1 min-w-0">✓ Already ordered</span>
-            )}
-            {isMobile && !isExpanded && !isSelected && !hasExisting && blockReason && (
-              <span className="text-xs text-red-600 font-bold truncate flex-1 min-w-0">🚫 {blockReason}</span>
             )}
             {isMobile && !isExpanded && !isSelected && !hasExisting && !blockReason && warningInfo && (
               <span className="text-xs text-amber-700 font-bold truncate flex-1 min-w-0">⚠️ {warningInfo.message}</span>
@@ -625,23 +656,25 @@ export default function MenuOrderClient({ childrenList, dishes, blockedDates, pr
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {isMobile && (
+            {isMobile && !blockReason && (
               <span className="text-xs text-muted-foreground">{isExpanded ? '▲' : '▼'}</span>
             )}
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => {
-                e.stopPropagation();
-                if (isDisabled) return;
-                toggleDay(day);
-                // On mobile, also expand the card when checking
-                if (isMobile && !isExpanded) toggleExpanded(dateKey, weekDays);
-              }}
-              disabled={isDisabled}
-              className="w-5 h-5 accent-primary cursor-pointer"
-              onClick={e => e.stopPropagation()}
-            />
+            {!blockReason && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (isDisabled) return;
+                  toggleDay(day);
+                  // On mobile, also expand the card when checking
+                  if (isMobile && !isExpanded) toggleExpanded(dateKey, weekDays);
+                }}
+                disabled={isDisabled}
+                className="w-5 h-5 accent-primary cursor-pointer"
+                onClick={e => e.stopPropagation()}
+              />
+            )}
           </div>
         </div>
 

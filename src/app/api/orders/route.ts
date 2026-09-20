@@ -116,10 +116,10 @@ export async function POST(req: NextRequest) {
     // Fetch blocked dates and ranges for backend validation
     const uniqueDates = Array.from(new Set(orders.map(o => o.order_date)));
     const [blockedRes, rangesRes] = await Promise.all([
-      supabaseAdmin.from('blocked_dates').select('date').in('date', uniqueDates),
-      supabaseAdmin.from('pro_d_ranges').select('start_date, end_date')
+      supabaseAdmin.from('blocked_dates').select('date, reason').in('date', uniqueDates),
+      supabaseAdmin.from('pro_d_ranges').select('start_date, end_date, message')
     ]);
-    const blockedDatesSet = new Set(blockedRes.data?.map(d => d.date) || []);
+    const blockedDatesMap = new Map((blockedRes.data || []).map(d => [d.date, d.reason]));
     const proDRanges = rangesRes.data || [];
 
     // Check cutoff time (1:00 PM prior day)
@@ -142,14 +142,19 @@ export async function POST(req: NextRequest) {
       }
 
       // 2. Validate Blocked Dates (Holidays)
-      if (blockedDatesSet.has(orderDateStr)) {
-         return NextResponse.json({ error: `Orders are closed on this date (${orderDateStr}).` }, { status: 400 });
+      if (blockedDatesMap.has(orderDateStr)) {
+         const reason = blockedDatesMap.get(orderDateStr);
+         return NextResponse.json({ 
+           error: `Orders are closed on this date (${orderDateStr}): ${reason || 'Holiday / School Closure'}.` 
+         }, { status: 400 });
       }
 
       // 3. Validate Pro-D Ranges
       for (const r of proDRanges) {
          if (orderDateStr >= r.start_date && orderDateStr <= r.end_date) {
-            return NextResponse.json({ error: `Orders are closed for a holiday range covering ${orderDateStr}.` }, { status: 400 });
+            return NextResponse.json({ 
+              error: `Orders are closed on this date (${orderDateStr}): ${r.message || 'Holiday Break'}.` 
+            }, { status: 400 });
          }
       }
 

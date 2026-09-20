@@ -19,10 +19,10 @@ export default async function AdminPlannerPage() {
     .order('sort_order', { ascending: true });
   
   // Fetch blocked dates to display them on the calendar
-  const { data: blockedDates } = await supabaseAdmin
-    .from('blocked_dates')
-    .select('*')
-    .eq('org_id', orgId);
+  const blockedDatesQuery = orgId 
+    ? supabaseAdmin.from('blocked_dates').select('*').or(`org_id.eq.${orgId},org_id.is.null`)
+    : supabaseAdmin.from('blocked_dates').select('*');
+  const { data: blockedDates } = await blockedDatesQuery;
 
   // Fetch Org Settings
   const { data: orgData } = await supabaseAdmin.from('organizations').select('id, settings').eq('id', orgId).single();

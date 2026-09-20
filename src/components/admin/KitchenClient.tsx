@@ -38,31 +38,38 @@ interface Order {
   order_items: OrderItem[];
 }
 
-export default function KitchenClient({ initialDishes, initialDate, initialTab }: { 
+export default function KitchenClient({ initialDishes, initialDate, initialEndDate, initialTab }: { 
   initialDishes: Dish[]; 
   initialDate?: string;
+  initialEndDate?: string;
   initialTab?: 'prep' | 'labels' | 'manifest';
 }) {
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || format(addDays(new Date(), 1), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(initialEndDate || '');
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'prep' | 'labels' | 'manifest'>(initialTab || 'prep');
 
   // Label sort state — 3 cascading sort fields
-  type SortField = 'dish' | 'school' | 'division' | 'childName' | 'lunchTime' | '';
+  type SortField = 'date' | 'dish' | 'school' | 'division' | 'childName' | 'lunchTime' | '';
   const [sort1, setSort1] = useState<SortField>('dish');
   const [sort2, setSort2] = useState<SortField>('school');
   const [sort3, setSort3] = useState<SortField>('');
 
-  // Fetch orders when date changes
+  // Fetch orders when date, endDate, or activeTab changes
   useEffect(() => {
     async function fetchOrders() {
       if (!selectedDate) return;
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/admin/kitchen?date=${selectedDate}`);
+        const isRange = activeTab === 'labels' && Boolean(endDate) && endDate >= selectedDate;
+        let url = `/api/admin/kitchen?date=${selectedDate}`;
+        if (isRange) {
+          url += `&endDate=${endDate}`;
+        }
+        const res = await fetch(url);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setOrders(data.orders || []);
@@ -73,7 +80,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
       }
     }
     fetchOrders();
-  }, [selectedDate]);
+  }, [selectedDate, endDate, activeTab]);
 
   // Color palette — 12 perceptually distinct hues
   const COLOR_PALETTE = [
@@ -174,6 +181,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
   // Helper to get sort value for a label
   const getLabelSortVal = (label: any, field: SortField): string => {
     if (!field) return '';
+    if (field === 'date') return label.orderDate || '';
     const dish = initialDishes.find(d => d.id === label.dishId);
     if (field === 'dish') return label.componentName || dish?.name || '';
     if (field === 'school') return (label.child?.schools as any)?.name || '';
@@ -198,6 +206,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
             components.forEach((compName, compIdx) => {
               list.push({
                 orderId: order.id,
+                orderDate: order.order_date || selectedDate,
                 child: order.children,
                 dishId: item.dish_id,
                 is_large: item.is_large,
@@ -211,6 +220,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
           } else {
             list.push({
               orderId: order.id,
+              orderDate: order.order_date || selectedDate,
               child: order.children,
               dishId: item.dish_id,
               is_large: item.is_large,
@@ -232,7 +242,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
       return 0;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, sort1, sort2, sort3, initialDishes]);
+  }, [orders, sort1, sort2, sort3, initialDishes, selectedDate]);
 
   // Aggregate Data
   const { mealTotals, ingredientTotals, totalPrepTime, totalCookTime, totalPackSeconds } = useMemo(() => {
@@ -304,13 +314,18 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
     setDownloading(true);
     try {
       const sortParams = [sort1, sort2, sort3].filter(Boolean).join(',');
-      const res = await fetch(`/api/admin/labels-pdf?date=${selectedDate}&sort=${sortParams}&t=${Date.now()}`);
+      const isRange = Boolean(endDate) && endDate >= selectedDate;
+      let pdfUrl = `/api/admin/labels-pdf?date=${selectedDate}&sort=${sortParams}&t=${Date.now()}`;
+      if (isRange) {
+        pdfUrl += `&endDate=${endDate}`;
+      }
+      const res = await fetch(pdfUrl);
       if (!res.ok) throw new Error('Failed to generate PDF');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `labels-${selectedDate}.pdf`;
+      a.download = isRange ? `labels-${selectedDate}-to-${endDate}.pdf` : `labels-${selectedDate}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -481,16 +496,67 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
       {/* Controls - Hidden when printing */}
       <div className="bg-card border rounded-2xl p-6 shadow-sm flex flex-col gap-6 print:hidden">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Calendar className="w-4 h-4" /> Date :
-            </label>
-            <input 
-              type="date" 
-              value={selectedDate} 
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none min-w-[200px]"
-            />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" /> Start Date
+              </label>
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  if (endDate && e.target.value > endDate) {
+                    setEndDate('');
+                  }
+                }}
+                className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none min-w-[160px]"
+              />
+            </div>
+
+            {activeTab === 'labels' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" /> End Date <span className="text-[10px] font-normal lowercase text-muted-foreground">(optional)</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input 
+                    type="date" 
+                    value={endDate}
+                    min={selectedDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-1 focus:ring-primary outline-none min-w-[160px]"
+                  />
+                  {endDate && (
+                    <button
+                      type="button"
+                      onClick={() => setEndDate('')}
+                      className="h-10 px-2.5 rounded-lg border border-input bg-background hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                      title="Clear End Date (Single Day Only)"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <div className="hidden sm:flex items-center gap-1">
+                    {[1, 2, 3].map(days => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => {
+                          if (selectedDate) {
+                            setEndDate(format(addDays(new Date(selectedDate + 'T00:00:00'), days), 'yyyy-MM-dd'));
+                          }
+                        }}
+                        className="h-10 px-2 rounded-lg border border-dashed border-input bg-background hover:bg-muted text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
+                        title={`Set End Date to +${days} day${days > 1 ? 's' : ''}`}
+                      >
+                        +{days}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 bg-muted p-1 rounded-xl">
@@ -558,6 +624,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                     className="h-8 rounded-lg border border-input bg-background px-2 text-sm focus:ring-1 focus:ring-primary outline-none min-w-[140px]"
                   >
                     <option value="">— None —</option>
+                    <option value="date">Date</option>
                     <option value="dish">Item / Dish Name</option>
                     <option value="school">School Name</option>
                     <option value="division">Division / Class</option>
@@ -737,7 +804,7 @@ export default function KitchenClient({ initialDishes, initialDate, initialTab }
                   const displayName = labelInfo.componentName 
                     ? labelInfo.componentName 
                     : (isItemLarge && dish?.large_name ? dish.large_name : (dish?.name || ''));
-                  const printDate = formatLocalDate(selectedDate, { month: 'short', day: 'numeric' });
+                  const printDate = formatLocalDate(labelInfo.orderDate || selectedDate, { month: 'short', day: 'numeric' });
                   // Sequential unique icon per school (guaranteed no collisions)
                   // ECS EC is always 'cross'; all other schools get sequential pictographic icons
                   const schoolIconName = schoolIconMap[schoolName] || 'heart';

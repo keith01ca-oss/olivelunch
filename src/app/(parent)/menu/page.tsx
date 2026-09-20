@@ -48,10 +48,10 @@ export default async function MenuPage({ searchParams }: { searchParams: { child
     .order('sort_order', { ascending: true });
 
   // Fetch blocked dates, pro-d dates & warnings
-  const { data: blockedDates } = await supabaseAdmin
-    .from('blocked_dates')
-    .select('*')
-    .eq('org_id', orgId);
+  const blockedDatesQuery = orgId 
+    ? supabaseAdmin.from('blocked_dates').select('*').or(`org_id.eq.${orgId},org_id.is.null`)
+    : supabaseAdmin.from('blocked_dates').select('*');
+  const { data: blockedDates } = await blockedDatesQuery;
   const { data: prodDates } = await supabaseAdmin.from('pro_d_ranges').select('*');
   const { data: dateWarnings } = await supabaseAdmin.from('date_warnings').select('*');
 

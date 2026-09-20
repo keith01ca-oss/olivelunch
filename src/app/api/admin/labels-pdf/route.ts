@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
+  const endDate = searchParams.get('endDate');
   const orgId = await getOrResolveOrgId();
 
   if (!date) {
@@ -73,8 +74,8 @@ export async function GET(req: NextRequest) {
   const sortParam = searchParams.get('sort') || '';
   const sortFields = sortParam.split(',').filter(Boolean);
 
-  // Fetch orders
-  const { data: orders, error } = await supabaseAdmin
+  // Fetch orders (single date or date range)
+  let ordersQuery = supabaseAdmin
     .from('orders')
     .select(`
       id,
@@ -82,9 +83,16 @@ export async function GET(req: NextRequest) {
       order_items (dish_id, quantity, is_large),
       children (name, division, delivery_location, lunch_time, schools(name, school_routes(stop_order, routes(route_number))))
     `)
-    .eq('order_date', date)
     .eq('status', 'paid')
     .eq('org_id', orgId);
+
+  if (endDate && endDate >= date) {
+    ordersQuery = ordersQuery.gte('order_date', date).lte('order_date', endDate);
+  } else {
+    ordersQuery = ordersQuery.eq('order_date', date);
+  }
+
+  const { data: orders, error } = await ordersQuery.order('order_date', { ascending: true });
 
   if (error || !orders) {
     return NextResponse.json({ error: error?.message || 'No data' }, { status: 500 });
@@ -180,6 +188,7 @@ export async function GET(req: NextRequest) {
         if (components) {
           components.forEach((compName, compIdx) => {
             labels.push({
+              orderDate: order.order_date || date,
               childName: order.children?.name || '',
               division,
               divKey,
@@ -201,6 +210,7 @@ export async function GET(req: NextRequest) {
         } else {
           const finalDishName = isLarge && dishInfo?.large_name ? dishInfo.large_name : (dishInfo?.name || '');
           labels.push({
+            orderDate: order.order_date || date,
             childName: order.children?.name || '',
             division,
             divKey,
@@ -223,6 +233,7 @@ export async function GET(req: NextRequest) {
 
   // Sort by cascading sort fields
   const getSortVal = (label: any, field: string): string => {
+    if (field === 'date') return label.orderDate || '';
     if (field === 'dish') return label.dishName || '';
     if (field === 'school') return label.schoolName || '';
     if (field === 'division') return label.division || '';
@@ -583,8 +594,12 @@ export async function GET(req: NextRequest) {
       .fontSize(6)
       .fillColor('black');
 
+    const labelPrintDate = formatLocalDate(label.orderDate || date, {
+      month: 'short', day: 'numeric',
+    });
+
     const routeW = routeText ? doc.widthOfString(routeText) + 4 : 0;
-    const dateW = printDate ? doc.widthOfString(printDate) + 4 : 0;
+    const dateW = labelPrintDate ? doc.widthOfString(labelPrintDate) + 4 : 0;
     const midX = x + padL + routeW;
     const midW = Math.max(0, textW - routeW - dateW);
 
@@ -592,8 +607,8 @@ export async function GET(req: NextRequest) {
       doc.text(routeText, x + padL, line5Y, { width: routeW, ellipsis: true, lineBreak: false });
     }
 
-    if (printDate) {
-      doc.text(printDate, x + LABEL_W - padR - dateW, line5Y, { width: dateW, align: 'right', lineBreak: false });
+    if (labelPrintDate) {
+      doc.text(labelPrintDate, x + LABEL_W - padR - dateW, line5Y, { width: dateW, align: 'right', lineBreak: false });
     }
 
     if (label.deliveryLocation && midW > 12) {
@@ -628,10 +643,14 @@ export async function GET(req: NextRequest) {
     doc.on('end', () => resolve(Buffer.concat(buffers)));
   });
 
+  const filename = endDate && endDate >= date
+    ? `labels-${date}-to-${endDate}.pdf`
+    : `labels-${date}.pdf`;
+
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="labels-${date}.pdf"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': pdfBuffer.length.toString(),
     },
   });

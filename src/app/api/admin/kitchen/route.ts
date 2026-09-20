@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date');
+  const endDate = searchParams.get('endDate');
   const orgId = await getOrResolveOrgId();
 
   if (!date) {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch all paid orders for the specified date
+    // Fetch all paid orders for the specified date (or date range)
     let query = supabaseAdmin
       .from('orders')
       .select(`
@@ -39,10 +40,16 @@ export async function GET(req: NextRequest) {
           )
         )
       `)
-      .eq('order_date', date)
       .eq('status', 'paid')
       .eq('org_id', orgId);
-    const { data: orders, error } = await query;
+
+    if (endDate && endDate >= date) {
+      query = query.gte('order_date', date).lte('order_date', endDate);
+    } else {
+      query = query.eq('order_date', date);
+    }
+
+    const { data: orders, error } = await query.order('order_date', { ascending: true });
 
     if (error) throw error;
 
