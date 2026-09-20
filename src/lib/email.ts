@@ -369,12 +369,14 @@ export async function sendAdminNewOrderNotification(orderIds: string[], orgId?: 
 
 /**
  * Calculates the target order date for the daily summary based on the kitchen schedule:
- * - Monday night (Tuesday 12am) -> Wednesday orders
- * - Tuesday night (Wednesday 12am) -> Thursday orders
- * - Wednesday night (Thursday 12am) -> Friday orders
- * - Thursday night (Friday 12am) -> Monday orders
- * - Friday night (Saturday 12am) -> Tuesday orders
- * - Saturday & Sunday nights -> Skipped
+ * - 12:00 AM midnight = night right after 11:59 PM (e.g. Friday 12am = Thursday late night after 11:59pm entering Friday)
+ * - Sunday 12am -> Tuesday orders (offset +2)
+ * - Monday 12am -> Wednesday orders (offset +2)
+ * - Tuesday 12am -> Thursday orders (offset +2)
+ * - Wednesday 12am -> Friday orders (offset +2)
+ * - Thursday 12am -> Skipped (no school meal on Saturday)
+ * - Friday 12am -> Monday orders (offset +3)
+ * - Saturday 12am -> Skipped (no school meal on Sunday)
  */
 export function calculateSummaryTargetDate(now: Date = new Date()): { targetDateStr: string; skipped: boolean; reason?: string } {
   const vancouverDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }); // YYYY-MM-DD
@@ -390,30 +392,29 @@ export function calculateSummaryTargetDate(now: Date = new Date()): { targetDate
 
   // At midnight cron execution (hour < 12)
   if (hour < 12) {
-    if (dayOfWeek === 1) offsetDays = 0; // Mon 12am (Sun night) -> Mon orders (final summary after weekend cutoff)
-    else if (dayOfWeek === 2) offsetDays = 1; // Tue 12am (Mon night) -> Wed
-    else if (dayOfWeek === 3) offsetDays = 1; // Wed 12am (Tue night) -> Thu
-    else if (dayOfWeek === 4) offsetDays = 1; // Thu 12am (Wed night) -> Fri
+    if (dayOfWeek === 0) offsetDays = 2; // Sun 12am (Sat night) -> Tue
+    else if (dayOfWeek === 1) offsetDays = 2; // Mon 12am (Sun night) -> Wed
+    else if (dayOfWeek === 2) offsetDays = 2; // Tue 12am (Mon night) -> Thu
+    else if (dayOfWeek === 3) offsetDays = 2; // Wed 12am (Tue night) -> Fri
+    else if (dayOfWeek === 4) skip = true;   // Thu 12am (Wed night) -> Skip (no Sat meals)
     else if (dayOfWeek === 5) offsetDays = 3; // Fri 12am (Thu night) -> Mon
-    else if (dayOfWeek === 6) offsetDays = 3; // Sat 12am (Fri night) -> Tue
-    else skip = true; // Sun 12am (Sat night) -> Skip
+    else if (dayOfWeek === 6) skip = true;   // Sat 12am (Fri night) -> Skip (no Sun meals)
   } else {
-    // Afternoon / evening execution (e.g. testing from admin panel)
-    if (dayOfWeek === 0) offsetDays = 1; // Sun -> Mon
-    else if (dayOfWeek === 1) offsetDays = 2; // Mon -> Wed
-    else if (dayOfWeek === 2) offsetDays = 2; // Tue -> Thu
-    else if (dayOfWeek === 3) offsetDays = 2; // Wed -> Fri
-    else if (dayOfWeek === 4) offsetDays = 4; // Thu -> Mon
-    else if (dayOfWeek === 5) offsetDays = 4; // Fri -> Tue
-    else if (dayOfWeek === 6) offsetDays = 2; // Sat -> Mon
-    else skip = true;
+    // Afternoon / evening execution (e.g. testing from admin panel for upcoming midnight run)
+    if (dayOfWeek === 0) offsetDays = 3; // Sun PM -> upcoming Mon 12am -> Wed
+    else if (dayOfWeek === 1) offsetDays = 3; // Mon PM -> upcoming Tue 12am -> Thu
+    else if (dayOfWeek === 2) offsetDays = 3; // Tue PM -> upcoming Wed 12am -> Fri
+    else if (dayOfWeek === 3) skip = true;   // Wed PM -> upcoming Thu 12am -> Skip
+    else if (dayOfWeek === 4) offsetDays = 4; // Thu PM -> upcoming Fri 12am -> Mon
+    else if (dayOfWeek === 5) skip = true;   // Fri PM -> upcoming Sat 12am -> Skip
+    else if (dayOfWeek === 6) offsetDays = 3; // Sat PM -> upcoming Sun 12am -> Tue
   }
 
   if (skip) {
     return {
       targetDateStr: vancouverDateStr,
       skipped: true,
-      reason: 'No summary scheduled for Saturday night run'
+      reason: 'No summary scheduled for this day (no school meals on weekends)'
     };
   }
 
@@ -427,15 +428,16 @@ export function calculateSummaryTargetDate(now: Date = new Date()): { targetDate
 /**
  * Sends a summary of meal quantities for target date.
  * Kitchen Schedule:
- * - Monday sends Wednesday
- * - Tuesday sends Thursday
- * - Wednesday sends Friday
- * - Thursday sends Monday
- * - Friday sends Tuesday
- * - Saturday & Sunday skipped
+ * - Sunday 12am sends Tuesday
+ * - Monday 12am sends Wednesday
+ * - Tuesday 12am sends Thursday
+ * - Wednesday 12am sends Friday
+ * - Thursday 12am skipped
+ * - Friday 12am sends Monday
+ * - Saturday 12am skipped
  * Rules:
- * - Only sent when there is at least 1 order for that day (0 orders skipped)
- * - Subject: e.g. "sept 18 order summary"
+ * - Zero orders sends '[date] no order'
+ * - Subject: e.g. "sept 23 order summary"
  * - Body: exact item quantities, e.g.:
  *     2 x chicken nugget
  *     1 x spring roll
