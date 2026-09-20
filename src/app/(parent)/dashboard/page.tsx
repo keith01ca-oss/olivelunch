@@ -161,16 +161,16 @@ export default async function DashboardPage({
       {searchParams?.success === 'true' && (
         <>
           <ClearCartOnSuccess />
-          <div className="p-5 rounded-2xl border-2 bg-emerald-50 border-emerald-200 text-emerald-950 shadow-md animate-in fade-in slide-in-from-top-4 duration-300 flex items-start gap-4">
-          <div className="text-3xl">🥳</div>
-          <div className="flex-1">
-            <h4 className="font-extrabold text-lg text-emerald-900">Order Placed Successfully!</h4>
-            <p className="text-sm font-semibold mt-1">
-              {searchParams?.session_id 
-                ? 'Your payment was processed and your lunch order is now active.'
-                : 'Your order was paid 100% using your available account credit.'}
-            </p>
-          </div>
+          <div className="p-5 rounded-2xl border-2 bg-emerald-50 border-emerald-300 text-emerald-950 shadow-sm flex items-start gap-4">
+            <div className="text-3xl shrink-0">🥳</div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-extrabold text-lg text-emerald-950">Order Placed Successfully!</h4>
+              <p className="text-sm font-semibold text-emerald-900 mt-1">
+                {searchParams?.session_id 
+                  ? 'Your payment was processed and your lunch order is now active.'
+                  : 'Your order was paid 100% using your available account credit.'}
+              </p>
+            </div>
           </div>
         </>
       )}
@@ -201,22 +201,22 @@ export default async function DashboardPage({
         <div className="space-y-3">
           {dashboardMessages.map((msg) => {
             const bgClass = msg.type === 'warning' 
-              ? 'bg-amber-50 border-amber-200 text-amber-900' 
+              ? 'bg-amber-50 border-amber-300' 
               : msg.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-blue-50 border-blue-200 text-blue-900';
+              ? 'bg-emerald-50 border-emerald-300'
+              : 'bg-blue-50 border-blue-300';
             
-            const accentText = msg.type === 'warning'
-              ? 'text-amber-800'
+            const textClass = msg.type === 'warning'
+              ? 'text-amber-950'
               : msg.type === 'success'
-              ? 'text-emerald-800'
-              : 'text-blue-800';
+              ? 'text-emerald-950'
+              : 'text-blue-950';
 
             return (
-              <div key={msg.id} className={`p-5 rounded-2xl border-2 ${bgClass} shadow-sm animate-in fade-in slide-in-from-top-4 duration-300 flex items-start gap-3`}>
-                <div className="text-lg">📢</div>
-                <div className="flex-1">
-                  <p className="text-sm font-bold leading-relaxed">{msg.message}</p>
+              <div key={msg.id} className={`p-5 rounded-2xl border-2 ${bgClass} shadow-sm flex items-start gap-3`}>
+                <div className="text-lg shrink-0">📢</div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-bold leading-relaxed ${textClass}`}>{msg.message}</p>
                 </div>
               </div>
             );
