@@ -2,7 +2,7 @@
 // Trigger redeploy to pick up live environment variables
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['pdfkit', 'pdfjs-dist'],
+    serverComponentsExternalPackages: ['pdfkit', 'unpdf'],
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false;

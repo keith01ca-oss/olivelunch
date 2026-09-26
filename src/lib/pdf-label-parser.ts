@@ -35,16 +35,8 @@ const DATE_REGEX = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|ju
  */
 export async function parseAvery5160Pdf(pdfBuffer: Buffer): Promise<ParseResult> {
   try {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js');
-    const lib = (pdfjs as any).default || pdfjs;
-
-    const loadingTask = lib.getDocument({
-      data: new Uint8Array(pdfBuffer),
-      disableFontFace: true,
-      useSystemFonts: true,
-    });
-
-    const doc = await loadingTask.promise;
+    const { getDocumentProxy } = await import('unpdf');
+    const doc = await getDocumentProxy(new Uint8Array(pdfBuffer));
     const numPages = doc.numPages;
     const labels: ParsedLabelItem[] = [];
     const schoolsSet = new Set<string>();
