@@ -37,9 +37,9 @@ export default function LabelTransformerTab({ initialSchools = [] }: LabelTransf
   const [registeredSchools, setRegisteredSchools] = useState<string[]>(initialSchools);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Sorting controls
-  const [sort1, setSort1] = useState<string>('school');
-  const [sort2, setSort2] = useState<string>('division');
+  // Sorting controls (default: division -> student name -> dish)
+  const [sort1, setSort1] = useState<string>('division');
+  const [sort2, setSort2] = useState<string>('childName');
   const [sort3, setSort3] = useState<string>('dish');
 
   // Batch setters
@@ -212,7 +212,7 @@ export default function LabelTransformerTab({ initialSchools = [] }: LabelTransf
     if (activeSorts.length > 0) {
       copy.sort((a, b) => {
         for (const sf of activeSorts) {
-          const cmp = getSortVal(a, sf).localeCompare(getSortVal(b, sf));
+          const cmp = getSortVal(a, sf).localeCompare(getSortVal(b, sf), undefined, { numeric: true, sensitivity: 'base' });
           if (cmp !== 0) return cmp;
         }
         return 0;
@@ -454,12 +454,16 @@ export default function LabelTransformerTab({ initialSchools = [] }: LabelTransf
                             {activePreviewLabel.lunchTime}
                           </span>
                         )}
-                        <span 
-                          className="text-[9px] font-black px-1.5 py-0.5 rounded border border-black/80 bg-white leading-none"
-                          style={{ borderColor: computedDivColorMap[activePreviewLabel.division] || '#333' }}
-                        >
-                          {activePreviewLabel.division || 'DIV'}
-                        </span>
+                        {activePreviewLabel.division ? (
+                          <span 
+                            className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-white leading-none whitespace-nowrap shadow-xs"
+                            style={{ borderColor: computedDivColorMap[activePreviewLabel.division] || '#333' }}
+                          >
+                            {activePreviewLabel.division.toUpperCase().startsWith('DIV')
+                              ? activePreviewLabel.division.toUpperCase()
+                              : `DIV ${activePreviewLabel.division.toUpperCase()}`}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 

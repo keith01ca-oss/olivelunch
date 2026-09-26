@@ -97,27 +97,32 @@ export function drawAvery5160Label(doc: any, label: StandardLabelData, col: numb
   doc.restore();
 
   // 2. LINE 1: Child Name (left), Lunch Time, Division Badge (right)
-  const badgeW = 26;
+  const badgeText = label.division
+    ? (label.division.toUpperCase().startsWith('DIV') ? label.division.toUpperCase() : `DIV ${label.division.toUpperCase()}`)
+    : '';
+
+  doc.font('Helvetica-Bold').fontSize(6.5);
+  const badgeW = badgeText ? Math.max(26, doc.widthOfString(badgeText) + 8) : 0;
   const badgeH = 9;
   const badgeX = x + LABEL_W - padR - badgeW;
   const line1Y = y + 7.5;
 
   // Division badge (far right)
-  if (label.division) {
+  if (badgeText) {
     doc.save()
       .roundedRect(badgeX, line1Y - 1, badgeW, badgeH, 1.5)
       .stroke(color)
       .font('Helvetica-Bold')
       .fontSize(6.5)
       .fillColor('black')
-      .text(label.division, badgeX, line1Y + 0.5, { width: badgeW, align: 'center', lineBreak: false })
+      .text(badgeText, badgeX, line1Y + 0.5, { width: badgeW, align: 'center', lineBreak: false })
       .restore();
   }
 
   // Lunch Time (immediately to the left of division badge)
   const lunchTime = label.lunchTime || '';
   const timeW = lunchTime ? 38 : 0;
-  const timeX = badgeX - timeW - 4;
+  const timeX = (badgeText ? badgeX : x + LABEL_W - padR) - timeW - (badgeText ? 4 : 0);
   if (lunchTime) {
     doc.save()
       .font('Helvetica-Bold')
@@ -128,7 +133,7 @@ export function drawAvery5160Label(doc: any, label: StandardLabelData, col: numb
   }
 
   // Child Name (left of Time)
-  const nameMaxW = textW - (label.division ? badgeW : 0) - (timeW ? timeW + 8 : 4);
+  const nameMaxW = textW - (badgeText ? badgeW + 4 : 0) - (timeW ? timeW + 4 : 0);
   doc.save()
     .font('Helvetica-Bold')
     .fontSize(7.5)

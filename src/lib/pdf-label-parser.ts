@@ -154,7 +154,7 @@ export async function parseAvery5160Pdf(pdfBuffer: Buffer): Promise<ParseResult>
 /**
  * Heuristic field extractor from text lines of an individual label.
  */
-export function extractFieldsFromLines(lines: string[]): {
+export function extractFieldsFromLines(rawLines: string[]): {
   childName: string;
   division: string;
   dishName: string;
@@ -173,92 +173,122 @@ export function extractFieldsFromLines(lines: string[]): {
   let notes = '';
   let isLarge = false;
 
-  const remainingLines: string[] = [...lines];
+  const lines = rawLines.map(l => l.trim()).filter(Boolean);
 
   // 1. Check for Large indicator
-  for (let i = 0; i < remainingLines.length; i++) {
-    if (LARGE_REGEX.test(remainingLines[i])) {
+  for (let i = 0; i < lines.length; i++) {
+    if (/(?:\(|\b)(?:large|lg)(?:\)|\b)/i.test(lines[i])) {
       isLarge = true;
-      remainingLines[i] = remainingLines[i].replace(LARGE_REGEX, '').trim();
+      lines[i] = lines[i].replace(/(?:\(|\b)(?:large|lg)(?:\)|\b)/gi, '').trim();
     }
   }
 
-  // 2. Find Division / Class
-  for (let i = 0; i < remainingLines.length; i++) {
-    const line = remainingLines[i];
-    const match = line.match(DIVISION_REGEX);
-    if (match) {
-      division = match[0].trim();
-      // Remove division from this line
-      const cleaned = line.replace(match[0], '').replace(/[-–—,:|]/g, ' ').replace(/\s+/g, ' ').trim();
-      remainingLines[i] = cleaned;
+  // 2. Check Date
+  const dateIdx = lines.findIndex(l => 
+    /\b(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})\b/.test(l) ||
+    /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}\b/i.test(l)
+  );
+  if (dateIdx !== -1) {
+    orderDate = lines[dateIdx].trim();
+    lines.splice(dateIdx, 1);
+  }
+
+  // 3. Check Lunch Time
+  const timeIdx = lines.findIndex(l => /\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/i.test(l));
+  if (timeIdx !== -1) {
+    lunchTime = lines[timeIdx].trim();
+    lines.splice(timeIdx, 1);
+  }
+
+  // 4. Check Division & Child Name
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const divMatch = l.match(/(?:div(?:ision)?|gr(?:ade)?|rm|room)[:\.\s]*([a-z0-9\-_]+)/i);
+    if (divMatch) {
+      division = 'DIV ' + divMatch[1].toUpperCase();
+      // Remove div tag to see if student name is on the same line (e.g. DIV: 14 || KAEDEN REVALDE)
+      const cleaned = l.replace(/(?:div(?:ision)?|gr(?:ade)?|rm|room)[:\.\s]*[a-z0-9\-_]+/gi, '')
+                       .replace(/\|\||\||[-–—:]/g, ' ')
+                       .replace(/\s+/g, ' ')
+                       .trim();
+      if (cleaned) {
+        if (!childName) childName = cleaned;
+        lines.splice(i, 1);
+      } else {
+        lines.splice(i, 1);
+      }
       break;
     }
   }
 
-  // 3. Find Lunch Time
-  for (let i = 0; i < remainingLines.length; i++) {
-    const line = remainingLines[i];
-    const match = line.match(TIME_REGEX);
-    if (match) {
-      lunchTime = match[0].trim();
-      remainingLines[i] = line.replace(match[0], '').trim();
-      break;
+  // Fallback division check for Kindergarten or Grade
+  if (!division) {
+    for (let i = 0; i < lines.length; i++) {
+      const kMatch = lines[i].match(/\b(?:k(?:indergarten)?|gr\s*\d+)\b/i);
+      if (kMatch) {
+        division = kMatch[0].toUpperCase();
+        const cleaned = lines[i].replace(kMatch[0], '').replace(/\|\||\||[-–—:]/g, ' ').trim();
+        if (cleaned && !childName) childName = cleaned;
+        lines.splice(i, 1);
+        break;
+      }
     }
   }
 
-  // 4. Find Date
-  for (let i = 0; i < remainingLines.length; i++) {
-    const line = remainingLines[i];
-    const match = line.match(DATE_REGEX);
-    if (match) {
-      orderDate = match[0].trim();
-      remainingLines[i] = line.replace(match[0], '').trim();
-      break;
+  // If childName not yet set, the first remaining line is the child name
+  if (!childName && lines.length > 0) {
+    childName = lines.shift() || '';
+  }
+
+  // 5. Dish vs School Identification
+  // Check which line has dish characteristics (e.g., '( 1 )' prefix or food keywords)
+  const foodIdx = lines.findIndex(l => 
+    /^\s*\(\s*\d+\s*\)/.test(l) ||
+    /\b(?:pasta|lasagna|nuggets|nugget|pizza|burger|chicken|meatball|meatballs|rice|wrap|salad|sandwich|bowl|sushi|beef|pork|cheese|macaroni|roll|fries|fruit|combo|soup|meal|lunch)\b/i.test(l)
+  );
+
+  if (foodIdx !== -1) {
+    dishName = lines[foodIdx];
+    lines.splice(foodIdx, 1);
+    if (lines.length > 0) {
+      schoolName = lines.shift() || '';
+    }
+  } else {
+    // If one line matches known school keywords
+    const schoolIdx = lines.findIndex(l => 
+      SCHOOL_KEYWORDS.some(kw => l.toLowerCase().includes(kw))
+    );
+
+    if (schoolIdx !== -1) {
+      schoolName = lines[schoolIdx];
+      lines.splice(schoolIdx, 1);
+      if (lines.length > 0) {
+        dishName = lines.shift() || '';
+      }
+    } else {
+      if (lines.length >= 2) {
+        schoolName = lines[0];
+        dishName = lines[1];
+        lines.splice(0, 2);
+      } else if (lines.length === 1) {
+        dishName = lines[0];
+        lines.splice(0, 1);
+      }
     }
   }
 
-  // 5. Find School Name (look for school keywords)
-  for (let i = 0; i < remainingLines.length; i++) {
-    const lineLower = remainingLines[i].toLowerCase();
-    if (SCHOOL_KEYWORDS.some(kw => lineLower.includes(kw))) {
-      schoolName = remainingLines[i];
-      remainingLines.splice(i, 1);
-      break;
-    }
+  // Any remaining lines become notes
+  if (lines.length > 0) {
+    notes = lines.join(' • ');
   }
 
-  // Filter out empty lines after removals
-  const activeLines = remainingLines.filter(l => l.length > 0);
-
-  // 6. Child Name: Usually line 0
-  if (activeLines.length > 0) {
-    childName = activeLines[0];
-  }
-
-  // 7. Dish Name: Usually line 1
-  if (activeLines.length > 1) {
-    dishName = activeLines[1];
-  }
-
-  // 8. If school wasn't found by keyword, check remaining lines
-  if (!schoolName && activeLines.length > 2) {
-    schoolName = activeLines[2];
-  }
-
-  // Remaining lines become notes
-  if (activeLines.length > 3) {
-    notes = activeLines.slice(3).join(' • ');
-  }
-
-  // Fallbacks if only 1 line
-  if (!dishName && childName && activeLines.length === 1) {
+  if (!dishName && childName && !schoolName) {
     dishName = 'Lunch Meal';
   }
 
   return {
     childName: childName.trim(),
-    division: division.toUpperCase().replace(/\s+/g, ' ').trim(),
+    division: division.trim(),
     dishName: dishName.trim(),
     schoolName: schoolName.trim(),
     orderDate: orderDate.trim(),

@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     if (sortFields.length > 0) {
       labels.sort((a, b) => {
         for (const sf of sortFields) {
-          const cmp = getSortVal(a, sf).localeCompare(getSortVal(b, sf));
+          const cmp = getSortVal(a, sf).localeCompare(getSortVal(b, sf), undefined, { numeric: true, sensitivity: 'base' });
           if (cmp !== 0) return cmp;
         }
         return 0;
