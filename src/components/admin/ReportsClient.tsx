@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { format, addDays } from 'date-fns';
 import { 
   Printer, Tag, MapPin, ChefHat, FileText, Calendar, 
-  DollarSign, ShoppingBag, Users, Scale, TrendingUp, Loader2, Search, ArrowRight 
+  DollarSign, ShoppingBag, Users, Scale, TrendingUp, Loader2, Search, ArrowRight,
+  Sparkles, UploadCloud
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getReportData, getOutstandingCredits } from '@/app/admin/reports/actions';
+import LabelTransformerTab from '@/components/admin/LabelTransformerTab';
 
-type Tab = 'daily' | 'bi';
+type Tab = 'daily' | 'bi' | 'transformer';
 type ReportType = 'sold' | 'orders' | 'ingredients' | 'revenue' | 'credits' | 'schools';
 
 export default function ReportsClient() {
@@ -316,6 +318,20 @@ export default function ReportsClient() {
         >
           <TrendingUp className="w-4 h-4" />
           Interactive Business Reports
+        </button>
+        <button
+          onClick={() => setActiveTab('transformer')}
+          className={`px-4 py-2.5 text-sm font-extrabold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+            activeTab === 'transformer'
+              ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-emerald-600" />
+          Label Transformer (Upload &amp; Export)
+          <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
+            Avery 5160
+          </span>
         </button>
       </div>
 
@@ -783,6 +799,12 @@ export default function ReportsClient() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'transformer' && (
+        <div className="no-print">
+          <LabelTransformerTab />
         </div>
       )}
     </div>
